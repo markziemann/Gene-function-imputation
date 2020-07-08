@@ -1,0 +1,95 @@
+</br>
+<center> <h1> Yeast Sample Quality Filter </h1> </center>
+***
+
+#### The following code will determine the quality of the runs for S.Cerevisiae (Yeast) RNA-seq data downloaded from the [Digital Expression Explorer 2](http://dee2.io/) repository. It will quantify the number of PASS, WARN and FAIL runs and will filter samples with PASS runs  
+</br></br></br>
+
+
+Prerequisite libraries
+```{r Libraries, echo=TRUE}
+library("R.utils")
+library("dplyr")
+library("getDEE2")
+```
+
+
+1. Download and unzip the Yeast data 
+```{r Download Data, eval=FALSE, include=FALSE}
+download.file("http://dee2.io/mx/scerevisiae_se.tsv.bz2", 
+              destfile = "Data/scerevisiae_se.tsv.bz2")
+
+R.utils::bunzip2("Data/scerevisiae_se.tsv.bz2", "Data/scerevisiae_se.tsv", overwrite=TRUE, remove=FALSE)
+```
+
+2. Download and unzip the QC data
+```{r}
+download.file("http://dee2.io/mx/scerevisiae_qc.tsv.bz2", 
+              destfile = "Data/scerevisiae_qc.tsv.bz2")
+
+R.utils::bunzip2("Data/scerevisiae_qc.tsv.bz2", "Data/scerevisiae_qc.tsv", overwrite=TRUE, remove=FALSE)
+```
+
+3. Read Quality data, filter and quantify samples according to QC_SUMMARY = PASS, WARN, or FAIL.  
+```{r}
+quality_data <- read.csv("Data/scerevisiae_qc.tsv", sep = '\t', col.names = c("Sample", "Description", "Details"))
+
+# count the total number of QC_SUMMARY entries for checking
+qc_summary <- quality_data[quality_data$Description == 'QC_SUMMARY',]
+total_summary <- nrow(qc_summary)
+
+# count the total number of samples marked as PASS
+qc_pass <- filter(quality_data, grepl("PASS", Details))
+total_pass <- nrow(qc_pass)
+
+# count the total number of samples marked as WARN
+qc_warn <- filter(quality_data, grepl("WARN", Details))
+total_warn <- nrow(qc_warn)
+
+# count the total number of samples marked as FAIL
+qc_fail <- filter(quality_data, grepl("FAIL", Details))
+total_fail <- nrow(qc_fail)
+
+# Summary of counts. Addition of each PASS, WARN, and FAIL counts equals to total_summary.
+quality_summary <- data.frame(total_pass, total_warn, total_fail, total_summary)
+quality_summary
+
+```
+
+4. Select all the samples from scerevisiae_se.tsv with QC_SUMMARY == 'PASS' 
+```{r echo=TRUE}
+
+# filter all the sample names with QC_SUMMARY == 'PASS' from step 3
+sample_pass <- filter(quality_data, grepl("PASS", Details)) %>% select(Sample)
+
+# convert the rows into string and store on a list to use for filtering Yeast data
+sample_pass_list <- as.list(as.character(sample_pass$Sample))
+
+# read Yeast data
+scerevisiae_data <- read.csv("Data/scerevisiae_se.tsv", sep = '\t', col.names = c("Sample", "Gene", "Count"))
+
+# Filter Yeast data using generated list
+scerevisiae_pass <- scerevisiae_data[scerevisiae_data$Sample %in% sample_pass_list,]
+```
+
+5. Aggregate the SRR run data to SRX experiment 
+```{r}
+srx_agg <- function(x,counts="GeneCounts") {
+    IDX=which(names(x) %in% "GeneCounts")
+    mds<-x$MetadataSummary
+    n=nrow(x[[IDX]])
+    SRX_dat <- vapply(X=unique(mds$SRX_accession) ,
+        function(srx) {
+            srrs<-rownames(mds)[which(mds$SRX_accession %in% srx)]
+        rowSums(x[[IDX]][,srrs])
+    } , numeric(n))
+    SRX_dat
+}
+
+x <- getDEE2("ecoli",c("SRR1613487","SRR1613488"),legacy=TRUE)
+
+# Error 'x' must be an array of at least two dimensions
+srx_agg(x, counts="GeneCounts")
+```
+
+
