@@ -11,11 +11,12 @@ Prerequisite libraries
 library("R.utils")
 library("dplyr")
 library("getDEE2")
+library("tidyr")
 ```
 
 
 1. Download and unzip the Yeast data 
-```{r Download Data, eval=FALSE, include=FALSE}
+```{r Download Data, echo=TRUE}
 download.file("http://dee2.io/mx/scerevisiae_se.tsv.bz2", 
               destfile = "Data/scerevisiae_se.tsv.bz2")
 
@@ -23,7 +24,7 @@ R.utils::bunzip2("Data/scerevisiae_se.tsv.bz2", "Data/scerevisiae_se.tsv", overw
 ```
 
 2. Download and unzip the QC data
-```{r}
+```{r QC Data, echo=TRUE}
 download.file("http://dee2.io/mx/scerevisiae_qc.tsv.bz2", 
               destfile = "Data/scerevisiae_qc.tsv.bz2")
 
@@ -31,7 +32,7 @@ R.utils::bunzip2("Data/scerevisiae_qc.tsv.bz2", "Data/scerevisiae_qc.tsv", overw
 ```
 
 3. Read Quality data, filter and quantify samples according to QC_SUMMARY = PASS, WARN, or FAIL.  
-```{r}
+```{r QC Data Summary, echo=TRUE}
 quality_data <- read.csv("Data/scerevisiae_qc.tsv", sep = '\t', col.names = c("Sample", "Description", "Details"))
 
 # count the total number of QC_SUMMARY entries for checking
@@ -57,7 +58,7 @@ quality_summary
 ```
 
 4. Select all the samples from scerevisiae_se.tsv with QC_SUMMARY == 'PASS' 
-```{r echo=TRUE}
+```{r Filter yeast bulk data, echo=TRUE}
 
 # filter all the sample names with QC_SUMMARY == 'PASS' from step 3
 sample_pass <- filter(quality_data, grepl("PASS", Details)) %>% select(Sample)
@@ -66,30 +67,60 @@ sample_pass <- filter(quality_data, grepl("PASS", Details)) %>% select(Sample)
 sample_pass_list <- as.list(as.character(sample_pass$Sample))
 
 # read Yeast data
-scerevisiae_data <- read.csv("Data/scerevisiae_se.tsv", sep = '\t', col.names = c("Sample", "Gene", "Count"))
+scerevisiae_data <- read.csv("Data/scerevisiae_se.tsv", sep = '\t', header = FALSE)
 
 # Filter Yeast data using generated list
-scerevisiae_pass <- scerevisiae_data[scerevisiae_data$Sample %in% sample_pass_list,]
+scerevisiae_pass <- scerevisiae_data[scerevisiae_data$V1 %in% sample_pass_list,] 
+
+# Convert format from long to wide
+scerevisiae_pass_wide <- scerevisiae_pass %>% pivot_wider(names_from = "V1", values_from = "V3")
+
+# Convert tibble to data frame and assign column 1 as rowname
+scerevisiae_pass_wide <- as.data.frame(scerevisiae_pass_wide)
+rownames(scerevisiae_pass_wide) <- scerevisiae_pass_wide[,1]
+scerevisiae_pass_wide <- scerevisiae_pass_wide[,-1]
 ```
 
 5. Aggregate the SRR run data to SRX experiment 
-```{r}
+```{r SRR to SRX Aggregation, echo=TRUE}
+
+# Download and read Metadata summary
+download.file("http://dee2.io/metadata/scerevisiae_metadata.tsv.cut", 
+              destfile = "Data/scerevisiae_metadata.tsv.cut")
+yeast_metadata <- read.csv("Data/scerevisiae_metadata.tsv.cut", sep = '\t')
+
+# Filter metadata to include only "passed" samples
+yeast_metadata_pass <- yeast_metadata[yeast_metadata$SRR_accession %in% sample_pass_list,]
+
+# Assign column 1 as rownames 
+rownames(yeast_metadata_pass) <- yeast_metadata_pass[,1]
+yeast_metadata_pass <- yeast_metadata_pass[,-1]
+
+# Sequencing Run aggregate function
 srx_agg <- function(x,counts="GeneCounts") {
     IDX=which(names(x) %in% "GeneCounts")
     mds<-x$MetadataSummary
     n=nrow(x[[IDX]])
-    SRX_dat <- vapply(X=unique(mds$SRX_accession) ,
-        function(srx) {
-            srrs<-rownames(mds)[which(mds$SRX_accession %in% srx)]
-        rowSums(x[[IDX]][,srrs])
+    SRX_dat <- vapply(X=unique(mds$SRX_accession) ,function(srx) {
+        srrs<-rownames(mds)[which(mds$SRX_accession %in% srx)]
+        if (length(srrs)>1) {
+            rowSums(x[[IDX]][,srrs])
+        } else {
+            x[[IDX]][,srrs]
+        }
     } , numeric(n))
+    rownames(SRX_dat) <- rownames(x[[IDX]])
     SRX_dat
 }
 
-x <- getDEE2("ecoli",c("SRR1613487","SRR1613488"),legacy=TRUE)
+# Put the filtered yeast GeneCount data and the filtered metadata dataframes into a list
+x <- list(GeneCounts = scerevisiae_pass_wide, MetadataSummary = yeast_metadata_pass)
 
-# Error 'x' must be an array of at least two dimensions
-srx_agg(x, counts="GeneCounts")
+# Apply both dataframes to the function
+y <- srx_agg(x)
+y
+
+# Results are clearer when View(y) function is used.
 ```
 
 
