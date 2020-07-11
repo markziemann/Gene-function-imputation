@@ -375,8 +375,10 @@ Yeast Sample Quality Filter
 <div id="the-following-code-will-determine-the-quality-of-the-runs-for-s.cerevisiae-yeast-rna-seq-data-downloaded-from-the-digital-expression-explorer-2-repository.-it-will-quantify-the-number-of-pass-warn-and-fail-runs-and-will-filter-samples-with-pass-runs" class="section level4">
 <h4>The following code will determine the quality of the runs for S.Cerevisiae (Yeast) RNA-seq data downloaded from the <a href="http://dee2.io/">Digital Expression Explorer 2</a> repository. It will quantify the number of PASS, WARN and FAIL runs and will filter samples with PASS runs</h4>
 <p></br></br></br></p>
-<p>Prerequisite libraries</p>
-<pre class="r"><code>library(&quot;R.utils&quot;)</code></pre>
+</div>
+<div id="prerequisite-libraries" class="section level3">
+<h3>Prerequisite libraries</h3>
+<pre class="r"><code>library(R.utils)</code></pre>
 <pre><code>## Loading required package: R.oo</code></pre>
 <pre><code>## Loading required package: R.methodsS3</code></pre>
 <pre><code>## R.methodsS3 v1.8.0 (2020-02-14 07:10:20 UTC) successfully loaded. See ?R.methodsS3 for help.</code></pre>
@@ -402,7 +404,7 @@ Yeast Sample Quality Filter
 ## 
 ##     cat, commandArgs, getOption, inherits, isOpen, nullfile, parse,
 ##     warnings</code></pre>
-<pre class="r"><code>library(&quot;dplyr&quot;)</code></pre>
+<pre class="r"><code>library(dplyr)</code></pre>
 <pre><code>## 
 ## Attaching package: 'dplyr'</code></pre>
 <pre><code>## The following objects are masked from 'package:stats':
@@ -411,45 +413,69 @@ Yeast Sample Quality Filter
 <pre><code>## The following objects are masked from 'package:base':
 ## 
 ##     intersect, setdiff, setequal, union</code></pre>
-<pre class="r"><code>library(&quot;getDEE2&quot;)
-library(&quot;tidyr&quot;)</code></pre>
+<pre class="r"><code>library(tidyr)</code></pre>
 <pre><code>## 
 ## Attaching package: 'tidyr'</code></pre>
 <pre><code>## The following object is masked from 'package:R.utils':
 ## 
 ##     extract</code></pre>
-<ol style="list-style-type: decimal">
-<li>Download and unzip the Yeast data</li>
-</ol>
+<pre class="r"><code>library(data.table)</code></pre>
+<pre><code>## 
+## Attaching package: 'data.table'</code></pre>
+<pre><code>## The following objects are masked from 'package:dplyr':
+## 
+##     between, first, last</code></pre>
+<p></br></p>
+</div>
+<div id="download-and-unzip-the-yeast-data" class="section level3">
+<h3>1. Download and unzip the Yeast data</h3>
 <pre class="r"><code>download.file(&quot;http://dee2.io/mx/scerevisiae_se.tsv.bz2&quot;, 
               destfile = &quot;Data/scerevisiae_se.tsv.bz2&quot;)
 
-R.utils::bunzip2(&quot;Data/scerevisiae_se.tsv.bz2&quot;, &quot;Data/scerevisiae_se.tsv&quot;, overwrite=TRUE, remove=FALSE)</code></pre>
-<ol start="2" style="list-style-type: decimal">
-<li>Download and unzip the QC data</li>
-</ol>
+scerevisiae_data &lt;- fread(&quot;Data/scerevisiae_se.tsv&quot;, sep = '\t', header = FALSE)
+
+head(scerevisiae_data)</code></pre>
+<pre><code>##           V1        V2  V3
+## 1: DRR023778   YDL248W 135
+## 2: DRR023778 YDL247W-A   0
+## 3: DRR023778   YDL247W   3
+## 4: DRR023778   YDL246C   0
+## 5: DRR023778   YDL245C   0
+## 6: DRR023778   YDL244W  35</code></pre>
+<p></br></p>
+</div>
+<div id="download-read-and-unzip-the-qc-data" class="section level3">
+<h3>2. Download, read, and unzip the QC data</h3>
 <pre class="r"><code>download.file(&quot;http://dee2.io/mx/scerevisiae_qc.tsv.bz2&quot;, 
               destfile = &quot;Data/scerevisiae_qc.tsv.bz2&quot;)
 
-R.utils::bunzip2(&quot;Data/scerevisiae_qc.tsv.bz2&quot;, &quot;Data/scerevisiae_qc.tsv&quot;, overwrite=TRUE, remove=FALSE)</code></pre>
-<ol start="3" style="list-style-type: decimal">
-<li>Read Quality data, filter and quantify samples according to QC_SUMMARY = PASS, WARN, or FAIL.</li>
-</ol>
-<pre class="r"><code>quality_data &lt;- read.csv(&quot;Data/scerevisiae_qc.tsv&quot;, sep = '\t', col.names = c(&quot;Sample&quot;, &quot;Description&quot;, &quot;Details&quot;))
+quality_data &lt;- fread(&quot;Data/scerevisiae_qc.tsv.bz2&quot;, sep = '\t', col.names = c(&quot;Database&quot;, &quot;Description&quot;, &quot;Details&quot;))
 
-# count the total number of QC_SUMMARY entries for checking
+head(quality_data)</code></pre>
+<pre><code>##     Database        Description            Details
+## 1: DRR023779    QualityEncoding Sanger/Illumina1.9
+## 2: DRR023779 Read1MinimumLength                 36
+## 3: DRR023779  Read1MedianLength                 36
+## 4: DRR023779     Read1MaxLength                 36
+## 5: DRR023779 Read2MinimumLength               NULL
+## 6: DRR023779  Read2MedianLength               NULL</code></pre>
+<p></br></p>
+</div>
+<div id="filter-and-quantify-databases-according-to-qc_summary-pass-warn-or-fail." class="section level3">
+<h3>3. Filter and quantify databases according to QC_SUMMARY = PASS, WARN, or FAIL.</h3>
+<pre class="r"><code># count the total number of QC_SUMMARY entries for checking
 qc_summary &lt;- quality_data[quality_data$Description == 'QC_SUMMARY',]
 total_summary &lt;- nrow(qc_summary)
 
-# count the total number of samples marked as PASS
+# count the total number of databases marked as PASS
 qc_pass &lt;- filter(quality_data, grepl(&quot;PASS&quot;, Details))
 total_pass &lt;- nrow(qc_pass)
 
-# count the total number of samples marked as WARN
+# count the total number of databases marked as WARN
 qc_warn &lt;- filter(quality_data, grepl(&quot;WARN&quot;, Details))
 total_warn &lt;- nrow(qc_warn)
 
-# count the total number of samples marked as FAIL
+# count the total number of databases marked as FAIL
 qc_fail &lt;- filter(quality_data, grepl(&quot;FAIL&quot;, Details))
 total_fail &lt;- nrow(qc_fail)
 
@@ -458,20 +484,18 @@ quality_summary &lt;- data.frame(total_pass, total_warn, total_fail, total_summa
 quality_summary</code></pre>
 <pre><code>##   total_pass total_warn total_fail total_summary
 ## 1       5286       5074      11036         21396</code></pre>
-<ol start="4" style="list-style-type: decimal">
-<li>Select all the samples from scerevisiae_se.tsv with QC_SUMMARY == ‘PASS’</li>
-</ol>
+<p></br></p>
+</div>
+<div id="select-all-the-databses-from-scerevisiae_se.tsv-with-qc_summary-pass" class="section level3">
+<h3>4. Select all the databses from scerevisiae_se.tsv with QC_SUMMARY == ‘PASS’</h3>
 <pre class="r"><code># filter all the sample names with QC_SUMMARY == 'PASS' from step 3
-sample_pass &lt;- filter(quality_data, grepl(&quot;PASS&quot;, Details)) %&gt;% select(Sample)
+databse_pass &lt;- filter(quality_data, grepl(&quot;PASS&quot;, Details)) %&gt;% select(Database)
 
 # convert the rows into string and store on a list to use for filtering Yeast data
-sample_pass_list &lt;- as.list(as.character(sample_pass$Sample))
-
-# read Yeast data
-scerevisiae_data &lt;- read.csv(&quot;Data/scerevisiae_se.tsv&quot;, sep = '\t', header = FALSE)
+databse_pass_list &lt;- as.list(as.character(databse_pass$Database))
 
 # Filter Yeast data using generated list
-scerevisiae_pass &lt;- scerevisiae_data[scerevisiae_data$V1 %in% sample_pass_list,] 
+scerevisiae_pass &lt;- scerevisiae_data[scerevisiae_data$V1 %in% databse_pass_list,] 
 
 # Convert format from long to wide
 scerevisiae_pass_wide &lt;- scerevisiae_pass %&gt;% pivot_wider(names_from = &quot;V1&quot;, values_from = &quot;V3&quot;)
@@ -480,16 +504,17 @@ scerevisiae_pass_wide &lt;- scerevisiae_pass %&gt;% pivot_wider(names_from = &qu
 scerevisiae_pass_wide &lt;- as.data.frame(scerevisiae_pass_wide)
 rownames(scerevisiae_pass_wide) &lt;- scerevisiae_pass_wide[,1]
 scerevisiae_pass_wide &lt;- scerevisiae_pass_wide[,-1]</code></pre>
-<ol start="5" style="list-style-type: decimal">
-<li>Aggregate the SRR run data to SRX experiment</li>
-</ol>
+<p></br></p>
+</div>
+<div id="aggregate-the-srr-run-data-to-srx-experiment" class="section level3">
+<h3>5. Aggregate the SRR run data to SRX experiment</h3>
 <pre class="r"><code># Download and read Metadata summary
 download.file(&quot;http://dee2.io/metadata/scerevisiae_metadata.tsv.cut&quot;, 
               destfile = &quot;Data/scerevisiae_metadata.tsv.cut&quot;)
 yeast_metadata &lt;- read.csv(&quot;Data/scerevisiae_metadata.tsv.cut&quot;, sep = '\t')
 
 # Filter metadata to include only &quot;passed&quot; samples
-yeast_metadata_pass &lt;- yeast_metadata[yeast_metadata$SRR_accession %in% sample_pass_list,]
+yeast_metadata_pass &lt;- yeast_metadata[yeast_metadata$SRR_accession %in% databse_pass_list,]
 
 # Assign column 1 as rownames 
 rownames(yeast_metadata_pass) &lt;- yeast_metadata_pass[,1]
@@ -513,11 +538,12 @@ srx_agg &lt;- function(x,counts=&quot;GeneCounts&quot;) {
 }
 
 # Put the filtered yeast GeneCount data and the filtered metadata dataframes into a list
-x &lt;- list(GeneCounts = scerevisiae_pass_wide, MetadataSummary = yeast_metadata_pass)
+yeast_count_metadata &lt;- list(GeneCounts = scerevisiae_pass_wide, MetadataSummary = yeast_metadata_pass)
 
 # Apply both dataframes to the function
-y &lt;- srx_agg(x)
-y</code></pre>
+agg &lt;- srx_agg(yeast_count_metadata)
+
+agg</code></pre>
 <pre><code>##             [,1]  [,2]   [,3]   [,4]   [,5]   [,6]   [,7]   [,8]   [,9]  [,10]
 ## YDL248W      135    34     78     37     81     41     56     53     50     72
 ## YDL247W-A      0     0      0      0      0      0      1      0      0      0

@@ -6,48 +6,53 @@
 </br></br></br>
 
 
-Prerequisite libraries
+### Prerequisite libraries
 ```{r Libraries, echo=TRUE}
-library("R.utils")
-library("dplyr")
-library("getDEE2")
-library("tidyr")
+library(R.utils)
+library(dplyr)
+library(tidyr)
+library(data.table)
 ```
+</br>
 
-
-1. Download and unzip the Yeast data 
+###  1. Download and unzip the Yeast data 
 ```{r Download Data, echo=TRUE}
 download.file("http://dee2.io/mx/scerevisiae_se.tsv.bz2", 
               destfile = "Data/scerevisiae_se.tsv.bz2")
 
-R.utils::bunzip2("Data/scerevisiae_se.tsv.bz2", "Data/scerevisiae_se.tsv", overwrite=TRUE, remove=FALSE)
-```
+scerevisiae_data <- fread("Data/scerevisiae_se.tsv", sep = '\t', header = FALSE)
 
-2. Download and unzip the QC data
+head(scerevisiae_data)
+```
+</br>
+
+### 2. Download, read, and unzip the QC data
 ```{r QC Data, echo=TRUE}
 download.file("http://dee2.io/mx/scerevisiae_qc.tsv.bz2", 
               destfile = "Data/scerevisiae_qc.tsv.bz2")
 
-R.utils::bunzip2("Data/scerevisiae_qc.tsv.bz2", "Data/scerevisiae_qc.tsv", overwrite=TRUE, remove=FALSE)
-```
+quality_data <- fread("Data/scerevisiae_qc.tsv.bz2", sep = '\t', col.names = c("Database", "Description", "Details"))
 
-3. Read Quality data, filter and quantify samples according to QC_SUMMARY = PASS, WARN, or FAIL.  
+head(quality_data)
+```
+</br>
+
+### 3. Filter and quantify databases according to QC_SUMMARY = PASS, WARN, or FAIL.  
 ```{r QC Data Summary, echo=TRUE}
-quality_data <- read.csv("Data/scerevisiae_qc.tsv", sep = '\t', col.names = c("Sample", "Description", "Details"))
 
 # count the total number of QC_SUMMARY entries for checking
 qc_summary <- quality_data[quality_data$Description == 'QC_SUMMARY',]
 total_summary <- nrow(qc_summary)
 
-# count the total number of samples marked as PASS
+# count the total number of databases marked as PASS
 qc_pass <- filter(quality_data, grepl("PASS", Details))
 total_pass <- nrow(qc_pass)
 
-# count the total number of samples marked as WARN
+# count the total number of databases marked as WARN
 qc_warn <- filter(quality_data, grepl("WARN", Details))
 total_warn <- nrow(qc_warn)
 
-# count the total number of samples marked as FAIL
+# count the total number of databases marked as FAIL
 qc_fail <- filter(quality_data, grepl("FAIL", Details))
 total_fail <- nrow(qc_fail)
 
@@ -56,21 +61,19 @@ quality_summary <- data.frame(total_pass, total_warn, total_fail, total_summary)
 quality_summary
 
 ```
+</br>
 
-4. Select all the samples from scerevisiae_se.tsv with QC_SUMMARY == 'PASS' 
+### 4. Select all the databses from scerevisiae_se.tsv with QC_SUMMARY == 'PASS' 
 ```{r Filter yeast bulk data, echo=TRUE}
 
 # filter all the sample names with QC_SUMMARY == 'PASS' from step 3
-sample_pass <- filter(quality_data, grepl("PASS", Details)) %>% select(Sample)
+databse_pass <- filter(quality_data, grepl("PASS", Details)) %>% select(Database)
 
 # convert the rows into string and store on a list to use for filtering Yeast data
-sample_pass_list <- as.list(as.character(sample_pass$Sample))
-
-# read Yeast data
-scerevisiae_data <- read.csv("Data/scerevisiae_se.tsv", sep = '\t', header = FALSE)
+databse_pass_list <- as.list(as.character(databse_pass$Database))
 
 # Filter Yeast data using generated list
-scerevisiae_pass <- scerevisiae_data[scerevisiae_data$V1 %in% sample_pass_list,] 
+scerevisiae_pass <- scerevisiae_data[scerevisiae_data$V1 %in% databse_pass_list,] 
 
 # Convert format from long to wide
 scerevisiae_pass_wide <- scerevisiae_pass %>% pivot_wider(names_from = "V1", values_from = "V3")
@@ -79,9 +82,11 @@ scerevisiae_pass_wide <- scerevisiae_pass %>% pivot_wider(names_from = "V1", val
 scerevisiae_pass_wide <- as.data.frame(scerevisiae_pass_wide)
 rownames(scerevisiae_pass_wide) <- scerevisiae_pass_wide[,1]
 scerevisiae_pass_wide <- scerevisiae_pass_wide[,-1]
-```
 
-5. Aggregate the SRR run data to SRX experiment 
+```
+</br>
+
+### 5. Aggregate the SRR run data to SRX experiment 
 ```{r SRR to SRX Aggregation, echo=TRUE}
 
 # Download and read Metadata summary
@@ -90,7 +95,7 @@ download.file("http://dee2.io/metadata/scerevisiae_metadata.tsv.cut",
 yeast_metadata <- read.csv("Data/scerevisiae_metadata.tsv.cut", sep = '\t')
 
 # Filter metadata to include only "passed" samples
-yeast_metadata_pass <- yeast_metadata[yeast_metadata$SRR_accession %in% sample_pass_list,]
+yeast_metadata_pass <- yeast_metadata[yeast_metadata$SRR_accession %in% databse_pass_list,]
 
 # Assign column 1 as rownames 
 rownames(yeast_metadata_pass) <- yeast_metadata_pass[,1]
@@ -114,11 +119,12 @@ srx_agg <- function(x,counts="GeneCounts") {
 }
 
 # Put the filtered yeast GeneCount data and the filtered metadata dataframes into a list
-x <- list(GeneCounts = scerevisiae_pass_wide, MetadataSummary = yeast_metadata_pass)
+yeast_count_metadata <- list(GeneCounts = scerevisiae_pass_wide, MetadataSummary = yeast_metadata_pass)
 
 # Apply both dataframes to the function
-y <- srx_agg(x)
-y
+agg <- srx_agg(yeast_count_metadata)
+
+agg
 
 # Results are clearer when View(y) function is used.
 ```
