@@ -1,17 +1,32 @@
-</br>
-<center> <h1> Yeast Sample Quality Filter </h1> </center>
+---
+title: "Yeast Sample Quality Filter "
+author: "Megan Soria"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+theme: cosmo
+---
+
 ***
 
-#### The following code will determine the quality of the runs for S.Cerevisiae (Yeast) RNA-seq data downloaded from the [Digital Expression Explorer 2](http://dee2.io/) repository. It will quantify the number of PASS, WARN and FAIL runs and will filter samples with PASS runs  
-</br></br></br>
+##### The following code will determine the quality of the runs for S.Cerevisiae (Yeast) RNA-seq data downloaded from the [Digital Expression Explorer 2](http://dee2.io/) repository. It will quantify the number of PASS, WARN and FAIL runs and will filter samples with PASS runs  
+
+***
+
+</br>
 
 
 ### Prerequisite libraries
 ```{r Libraries, echo=TRUE}
+suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidyr), library(data.table))
+})
+
 library(R.utils)
 library(dplyr)
 library(tidyr)
 library(data.table)
+
 ```
 </br>
 
@@ -83,6 +98,8 @@ scerevisiae_pass_wide <- as.data.frame(scerevisiae_pass_wide)
 rownames(scerevisiae_pass_wide) <- scerevisiae_pass_wide[,1]
 scerevisiae_pass_wide <- scerevisiae_pass_wide[,-1]
 
+scerevisiae_pass_wide[1:10,1:6]
+
 ```
 </br>
 
@@ -115,6 +132,7 @@ srx_agg <- function(x,counts="GeneCounts") {
         }
     } , numeric(n))
     rownames(SRX_dat) <- rownames(x[[IDX]])
+    colnames(SRX_dat) <- unique(mds$SRX_accession)
     SRX_dat
 }
 
@@ -124,9 +142,12 @@ yeast_count_metadata <- list(GeneCounts = scerevisiae_pass_wide, MetadataSummary
 # Apply both dataframes to the function
 agg <- srx_agg(yeast_count_metadata)
 
-agg
+agg[1:10,1:6]
 
-# Results are clearer when View(y) function is used.
+```
+
+```{r}
+sessionInfo()
 ```
 
 
