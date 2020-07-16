@@ -7,6 +7,7 @@ output:
     toc: true
 theme: cosmo
 ---
+</br>
 
 ***
 
@@ -19,13 +20,15 @@ theme: cosmo
 
 ### Prerequisite libraries
 ```{r Libraries, echo=TRUE}
-suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidyr), library(data.table))
-})
+suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidyr), library(data.table), library(RColorBrewer), library(gplots), library(viridis))})
 
 library(R.utils)
 library(dplyr)
 library(tidyr)
 library(data.table)
+library(RColorBrewer)
+library(viridis)
+library(gplots)
 
 ```
 </br>
@@ -145,8 +148,58 @@ agg <- srx_agg(yeast_count_metadata)
 agg[1:10,1:6]
 
 ```
+</br>
 
-```{r}
+### 6. Heirarchical Clustering with PASS only databases 
+
+```{r echo=TRUE}
+# summary show median != 0
+summary_non_normalized <- summary(scerevisiae_pass_wide)
+
+# normalize data
+scerevisiae_pass_normalized <- as.data.frame(scale(scerevisiae_pass_wide))
+
+# check that median = 0
+summary_normalized <- summary(scerevisiae_pass_normalized)
+
+# convert data frame to matrix
+scerevisiae_pass_matrix_norm <- as.matrix(scerevisiae_pass_normalized)
+
+
+cl <-as.dist(1-cor(t(scerevisiae_pass_matrix_norm), method="spearman"))
+str(cl)
+hr <- hclust(cl , method="complete")
+
+# need to optimise the cluster size - depends on your project
+mycl <- cutree(hr, h=max(hr$height/1.3))
+clusterCols <- brewer.pal(length(unique(mycl)),"Paired")
+myClusterSideBar <- clusterCols[mycl]
+colfunc <- colorRampPalette(c("blue", "white", "red"))
+write.table(mycl,file="Data/scerevisiae_pass.txt",quote=F,sep="\t")
+
+# create a 5 x 5 inch png image
+png("Data/yeast_heatmaps_pass.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)               
+
+# create heatmap
+heatmap.2(scerevisiae_pass_matrix_norm, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
+          dendrogram="both", scale="column", col = colfunc(25), trace="none", 
+          RowSideColors= myClusterSideBar, margins = c(5,5))
+
+dev.off()
+```
+
+
+</br>
+
+### 7. Heirarchical Clustering with PASS and WARN databases 
+```{r echo=TRUE}
+
+```
+
+
+### Session Information 
+
+```{r Session Info, echo=FALSE}
 sessionInfo()
 ```
 
