@@ -11,7 +11,7 @@
 
 <meta name="author" content="Megan Soria" />
 
-<meta name="date" content="2020-07-14" />
+<meta name="date" content="2020-07-17" />
 
 <title>Yeast Sample Quality Filter</title>
 
@@ -365,7 +365,7 @@ summary {
 
 <h1 class="title toc-ignore">Yeast Sample Quality Filter</h1>
 <h4 class="author">Megan Soria</h4>
-<h4 class="date">2020-07-14</h4>
+<h4 class="date">2020-07-17</h4>
 
 </div>
 
@@ -377,9 +377,13 @@ summary {
 <li><a href="#filter-and-quantify-databases-according-to-qc_summary-pass-warn-or-fail.">3. Filter and quantify databases according to QC_SUMMARY = PASS, WARN, or FAIL.</a></li>
 <li><a href="#select-all-the-databses-from-scerevisiae_se.tsv-with-qc_summary-pass">4. Select all the databses from scerevisiae_se.tsv with QC_SUMMARY == ‘PASS’</a></li>
 <li><a href="#aggregate-the-srr-run-data-to-srx-experiment">5. Aggregate the SRR run data to SRX experiment</a></li>
+<li><a href="#heirarchical-clustering-with-pass-only-databases">6. Heirarchical Clustering with PASS only databases</a></li>
+<li><a href="#heirarchical-clustering-with-pass-and-warn-databases">7. Heirarchical Clustering with PASS and WARN databases</a></li>
+<li><a href="#session-information">Session Information</a></li>
 </ul>
 </div>
 
+<p></br></p>
 <hr />
 <div id="the-following-code-will-determine-the-quality-of-the-runs-for-s.cerevisiae-yeast-rna-seq-data-downloaded-from-the-digital-expression-explorer-2-repository.-it-will-quantify-the-number-of-pass-warn-and-fail-runs-and-will-filter-samples-with-pass-runs" class="section level5">
 <h5>The following code will determine the quality of the runs for S.Cerevisiae (Yeast) RNA-seq data downloaded from the <a href="http://dee2.io/">Digital Expression Explorer 2</a> repository. It will quantify the number of PASS, WARN and FAIL runs and will filter samples with PASS runs</h5>
@@ -388,22 +392,33 @@ summary {
 </div>
 <div id="prerequisite-libraries" class="section level3">
 <h3>Prerequisite libraries</h3>
-<pre class="r"><code>suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidyr), library(data.table))
-})</code></pre>
-<pre><code>##  [1] &quot;R.utils&quot;     &quot;R.oo&quot;        &quot;R.methodsS3&quot; &quot;stats&quot;       &quot;graphics&quot;   
-##  [6] &quot;grDevices&quot;   &quot;utils&quot;       &quot;datasets&quot;    &quot;methods&quot;     &quot;base&quot;       
-## [11] &quot;dplyr&quot;       &quot;R.utils&quot;     &quot;R.oo&quot;        &quot;R.methodsS3&quot; &quot;stats&quot;      
-## [16] &quot;graphics&quot;    &quot;grDevices&quot;   &quot;utils&quot;       &quot;datasets&quot;    &quot;methods&quot;    
-## [21] &quot;base&quot;        &quot;tidyr&quot;       &quot;dplyr&quot;       &quot;R.utils&quot;     &quot;R.oo&quot;       
-## [26] &quot;R.methodsS3&quot; &quot;stats&quot;       &quot;graphics&quot;    &quot;grDevices&quot;   &quot;utils&quot;      
-## [31] &quot;datasets&quot;    &quot;methods&quot;     &quot;base&quot;        &quot;data.table&quot;  &quot;tidyr&quot;      
-## [36] &quot;dplyr&quot;       &quot;R.utils&quot;     &quot;R.oo&quot;        &quot;R.methodsS3&quot; &quot;stats&quot;      
-## [41] &quot;graphics&quot;    &quot;grDevices&quot;   &quot;utils&quot;       &quot;datasets&quot;    &quot;methods&quot;    
-## [46] &quot;base&quot;</code></pre>
+<pre class="r"><code>suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidyr), library(data.table), library(RColorBrewer), library(gplots), library(viridis))})</code></pre>
+<pre><code>##  [1] &quot;R.utils&quot;      &quot;R.oo&quot;         &quot;R.methodsS3&quot;  &quot;stats&quot;        &quot;graphics&quot;    
+##  [6] &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;        
+## [11] &quot;dplyr&quot;        &quot;R.utils&quot;      &quot;R.oo&quot;         &quot;R.methodsS3&quot;  &quot;stats&quot;       
+## [16] &quot;graphics&quot;     &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;     
+## [21] &quot;base&quot;         &quot;tidyr&quot;        &quot;dplyr&quot;        &quot;R.utils&quot;      &quot;R.oo&quot;        
+## [26] &quot;R.methodsS3&quot;  &quot;stats&quot;        &quot;graphics&quot;     &quot;grDevices&quot;    &quot;utils&quot;       
+## [31] &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;         &quot;data.table&quot;   &quot;tidyr&quot;       
+## [36] &quot;dplyr&quot;        &quot;R.utils&quot;      &quot;R.oo&quot;         &quot;R.methodsS3&quot;  &quot;stats&quot;       
+## [41] &quot;graphics&quot;     &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;     
+## [46] &quot;base&quot;         &quot;RColorBrewer&quot; &quot;data.table&quot;   &quot;tidyr&quot;        &quot;dplyr&quot;       
+## [51] &quot;R.utils&quot;      &quot;R.oo&quot;         &quot;R.methodsS3&quot;  &quot;stats&quot;        &quot;graphics&quot;    
+## [56] &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;        
+## [61] &quot;gplots&quot;       &quot;RColorBrewer&quot; &quot;data.table&quot;   &quot;tidyr&quot;        &quot;dplyr&quot;       
+## [66] &quot;R.utils&quot;      &quot;R.oo&quot;         &quot;R.methodsS3&quot;  &quot;stats&quot;        &quot;graphics&quot;    
+## [71] &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;        
+## [76] &quot;viridis&quot;      &quot;viridisLite&quot;  &quot;gplots&quot;       &quot;RColorBrewer&quot; &quot;data.table&quot;  
+## [81] &quot;tidyr&quot;        &quot;dplyr&quot;        &quot;R.utils&quot;      &quot;R.oo&quot;         &quot;R.methodsS3&quot; 
+## [86] &quot;stats&quot;        &quot;graphics&quot;     &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;    
+## [91] &quot;methods&quot;      &quot;base&quot;</code></pre>
 <pre class="r"><code>library(R.utils)
 library(dplyr)
 library(tidyr)
-library(data.table)</code></pre>
+library(data.table)
+library(RColorBrewer)
+library(viridis)
+library(gplots)</code></pre>
 <p></br></p>
 </div>
 <div id="download-and-unzip-the-yeast-data" class="section level3">
@@ -411,7 +426,13 @@ library(data.table)</code></pre>
 <pre class="r"><code>download.file(&quot;http://dee2.io/mx/scerevisiae_se.tsv.bz2&quot;, 
               destfile = &quot;Data/scerevisiae_se.tsv.bz2&quot;)
 
-scerevisiae_data &lt;- fread(&quot;Data/scerevisiae_se.tsv&quot;, sep = '\t', header = FALSE)
+# fread error msg: This file is very unusual: it ends abruptly without a final newline, and also its size is a multiple of 4096 bytes. Please properly end the last row with a newline using for example &#39;echo &gt;&gt; file&#39; to avoid this  time to copy. 
+
+# needed to go back to bunzip2
+
+bunzip2(&quot;Data/scerevisiae_se.tsv.bz2&quot;, destname=&quot;Data/scerevisiae_se.tsv&quot;)
+
+scerevisiae_data &lt;- fread(&quot;Data/scerevisiae_se.tsv&quot;, sep = &#39;\t&#39;, header = FALSE)
 
 head(scerevisiae_data)</code></pre>
 <pre><code>##           V1        V2  V3
@@ -428,7 +449,7 @@ head(scerevisiae_data)</code></pre>
 <pre class="r"><code>download.file(&quot;http://dee2.io/mx/scerevisiae_qc.tsv.bz2&quot;, 
               destfile = &quot;Data/scerevisiae_qc.tsv.bz2&quot;)
 
-quality_data &lt;- fread(&quot;Data/scerevisiae_qc.tsv.bz2&quot;, sep = '\t', col.names = c(&quot;Database&quot;, &quot;Description&quot;, &quot;Details&quot;))
+quality_data &lt;- fread(&quot;Data/scerevisiae_qc.tsv.bz2&quot;, sep = &#39;\t&#39;, col.names = c(&quot;Database&quot;, &quot;Description&quot;, &quot;Details&quot;))
 
 head(quality_data)</code></pre>
 <pre><code>##     Database        Description            Details
@@ -443,7 +464,7 @@ head(quality_data)</code></pre>
 <div id="filter-and-quantify-databases-according-to-qc_summary-pass-warn-or-fail." class="section level3">
 <h3>3. Filter and quantify databases according to QC_SUMMARY = PASS, WARN, or FAIL.</h3>
 <pre class="r"><code># count the total number of QC_SUMMARY entries for checking
-qc_summary &lt;- quality_data[quality_data$Description == 'QC_SUMMARY',]
+qc_summary &lt;- quality_data[quality_data$Description == &#39;QC_SUMMARY&#39;,]
 total_summary &lt;- nrow(qc_summary)
 
 # count the total number of databases marked as PASS
@@ -467,7 +488,7 @@ quality_summary</code></pre>
 </div>
 <div id="select-all-the-databses-from-scerevisiae_se.tsv-with-qc_summary-pass" class="section level3">
 <h3>4. Select all the databses from scerevisiae_se.tsv with QC_SUMMARY == ‘PASS’</h3>
-<pre class="r"><code># filter all the sample names with QC_SUMMARY == 'PASS' from step 3
+<pre class="r"><code># filter all the sample names with QC_SUMMARY == &#39;PASS&#39; from step 3
 databse_pass &lt;- filter(quality_data, grepl(&quot;PASS&quot;, Details)) %&gt;% select(Database)
 
 # convert the rows into string and store on a list to use for filtering Yeast data
@@ -503,7 +524,7 @@ scerevisiae_pass_wide[1:10,1:6]</code></pre>
 <pre class="r"><code># Download and read Metadata summary
 download.file(&quot;http://dee2.io/metadata/scerevisiae_metadata.tsv.cut&quot;, 
               destfile = &quot;Data/scerevisiae_metadata.tsv.cut&quot;)
-yeast_metadata &lt;- read.csv(&quot;Data/scerevisiae_metadata.tsv.cut&quot;, sep = '\t')
+yeast_metadata &lt;- read.csv(&quot;Data/scerevisiae_metadata.tsv.cut&quot;, sep = &#39;\t&#39;)
 
 # Filter metadata to include only &quot;passed&quot; samples
 yeast_metadata_pass &lt;- yeast_metadata[yeast_metadata$SRR_accession %in% databse_pass_list,]
@@ -548,8 +569,18 @@ agg[1:10,1:6]</code></pre>
 ## YDL242W           5         0         7         1         0         5
 ## YDL241W         293        42       100        84       181        89
 ## YDL240C-A         0         0         0         0         0         0</code></pre>
-<pre class="r"><code>sessionInfo()</code></pre>
-<pre><code>## R version 3.6.3 (2020-02-29)
+<p></br></p>
+</div>
+<div id="heirarchical-clustering-with-pass-only-databases" class="section level3">
+<h3>6. Heirarchical Clustering with PASS only databases</h3>
+<p></br></p>
+</div>
+<div id="heirarchical-clustering-with-pass-and-warn-databases" class="section level3">
+<h3>7. Heirarchical Clustering with PASS and WARN databases</h3>
+</div>
+<div id="session-information" class="section level3">
+<h3>Session Information</h3>
+<pre><code>## R version 4.0.2 (2020-06-22)
 ## Platform: x86_64-pc-linux-gnu (64-bit)
 ## Running under: Ubuntu 18.04.4 LTS
 ## 
@@ -569,17 +600,21 @@ agg[1:10,1:6]</code></pre>
 ## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-## [1] data.table_1.12.8 tidyr_1.1.0       dplyr_1.0.0       R.utils_2.9.2    
-## [5] R.oo_1.23.0       R.methodsS3_1.8.0
+##  [1] viridis_0.5.1      viridisLite_0.3.0  gplots_3.0.4       RColorBrewer_1.1-2
+##  [5] data.table_1.12.8  tidyr_1.1.0        dplyr_1.0.0        R.utils_2.9.2     
+##  [9] R.oo_1.23.0        R.methodsS3_1.8.0 
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] Rcpp_1.0.4.6     knitr_1.28       magrittr_1.5     tidyselect_1.1.0
-##  [5] R6_2.4.1         rlang_0.4.6      stringr_1.4.0    tools_3.6.3     
-##  [9] xfun_0.14        htmltools_0.4.0  ellipsis_0.3.1   yaml_2.2.1      
-## [13] digest_0.6.25    tibble_3.0.1     lifecycle_0.2.0  crayon_1.3.4    
-## [17] purrr_0.3.4      vctrs_0.3.1      glue_1.4.1       evaluate_0.14   
-## [21] rmarkdown_2.2    stringi_1.4.6    compiler_3.6.3   pillar_1.4.4    
-## [25] generics_0.0.2   pkgconfig_2.0.3</code></pre>
+##  [1] Rcpp_1.0.5         pillar_1.4.6       compiler_4.0.2     bitops_1.0-6      
+##  [5] tools_4.0.2        digest_0.6.25      evaluate_0.14      lifecycle_0.2.0   
+##  [9] tibble_3.0.3       gtable_0.3.0       pkgconfig_2.0.3    rlang_0.4.7       
+## [13] yaml_2.2.1         xfun_0.15          gridExtra_2.3      stringr_1.4.0     
+## [17] knitr_1.29         generics_0.0.2     vctrs_0.3.1        gtools_3.8.2      
+## [21] caTools_1.18.0     grid_4.0.2         tidyselect_1.1.0   glue_1.4.1        
+## [25] R6_2.4.1           rmarkdown_2.3      gdata_2.18.0       purrr_0.3.4       
+## [29] ggplot2_3.3.2      magrittr_1.5       scales_1.1.1       ellipsis_0.3.1    
+## [33] htmltools_0.5.0    colorspace_1.4-1   KernSmooth_2.23-17 stringi_1.4.6     
+## [37] munsell_0.5.0      crayon_1.3.4</code></pre>
 </div>
 
 

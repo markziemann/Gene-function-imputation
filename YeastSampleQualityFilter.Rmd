@@ -20,23 +20,23 @@ theme: cosmo
 
 ### Prerequisite libraries
 ```{r Libraries, echo=TRUE}
-suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidyr), library(data.table), library(RColorBrewer), library(gplots), library(viridis))})
-
-library(R.utils)
-library(dplyr)
-library(tidyr)
-library(data.table)
-library(RColorBrewer)
-library(viridis)
-library(gplots)
+suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidyr), library(data.table), library(RColorBrewer), library(gplots), library(viridis), library(DESeq2))})
 
 ```
 </br>
 
 ###  1. Download and unzip the Yeast data 
 ```{r Download Data, echo=TRUE}
+# put in an if statement to check if object exists
+
 download.file("http://dee2.io/mx/scerevisiae_se.tsv.bz2", 
               destfile = "Data/scerevisiae_se.tsv.bz2")
+
+# fread error msg: This file is very unusual: it ends abruptly without a final newline, and also its size is a multiple of 4096 bytes. Please properly end the last row with a newline using for example 'echo >> file' to avoid this  time to copy. 
+
+# needed to go back to bunzip2
+
+bunzip2("Data/scerevisiae_se.tsv.bz2", destname="Data/scerevisiae_se.tsv")
 
 scerevisiae_data <- fread("Data/scerevisiae_se.tsv", sep = '\t', header = FALSE)
 
@@ -147,30 +147,39 @@ agg <- srx_agg(yeast_count_metadata)
 
 agg[1:10,1:6]
 
+# Check for samples with zero total counts
+colSums(agg) == 0
+
+# Histogram showing samples (columns) counts
+hist(colSums(agg), breaks = 30)
+
+# Filtering samples with more than 1 million reads
+agg_f_col <- agg[, which(colSums(agg) >= 1e6)]
+
+
+# No difference between the filtered and unfiltered columns and 
+dim(agg_f_col_)
+dim(agg)
+
+# Filtering genes with more than zero counts 
+agg_f_row <- agg[which(rowSums(agg) > 0), ]
+dim(agg_f_row)
+
+
 ```
 </br>
 
 ### 6. Heirarchical Clustering with PASS only databases 
 
-```{r echo=TRUE}
-# summary show median != 0
-summary_non_normalized <- summary(scerevisiae_pass_wide)
-
-# normalize data
-scerevisiae_pass_normalized <- as.data.frame(scale(scerevisiae_pass_wide))
-
-# check that median = 0
-summary_normalized <- summary(scerevisiae_pass_normalized)
-
-# convert data frame to matrix
-scerevisiae_pass_matrix_norm <- as.matrix(scerevisiae_pass_normalized)
+```{r eval=FALSE, include=FALSE}
 
 
-cl <-as.dist(1-cor(t(scerevisiae_pass_matrix_norm), method="spearman"))
-str(cl)
+
+# Cluster the filtered genes with > 0 total counts
+cl <-as.dist(1-cor(t(yeast_f_row), method="spearman"))
 hr <- hclust(cl , method="complete")
 
-# need to optimise the cluster size - depends on your project
+# optimizing the cluster size
 mycl <- cutree(hr, h=max(hr$height/1.3))
 clusterCols <- brewer.pal(length(unique(mycl)),"Paired")
 myClusterSideBar <- clusterCols[mycl]
@@ -178,11 +187,11 @@ colfunc <- colorRampPalette(c("blue", "white", "red"))
 write.table(mycl,file="Data/scerevisiae_pass.txt",quote=F,sep="\t")
 
 # create a 5 x 5 inch png image
-png("Data/yeast_heatmaps_pass.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)               
+png("Data/yeast_heatmaps_pass_yeast_row.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)               
 
-# create heatmap
-heatmap.2(scerevisiae_pass_matrix_norm, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
-          dendrogram="both", scale="column", col = colfunc(25), trace="none", 
+# create the heatmap
+heatmap.2(yeast_f_row, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
+          dendrogram="both", scale="none", col = colfunc(25), trace="none", 
           RowSideColors= myClusterSideBar, margins = c(5,5))
 
 dev.off()
@@ -193,6 +202,27 @@ dev.off()
 
 ### 7. Heirarchical Clustering with PASS and WARN databases 
 ```{r echo=TRUE}
+
+```
+
+### random stings
+
+```{r}
+library("stringi")
+
+blind <- sample(rownames(agg_f_row), 10)
+
+rand <- stri_rand_strings(10, 15, pattern = "[A-Za-z]")
+
+
+dict <- data.frame(blind, rand)
+
+agg_rand <- agg_f_row
+
+ind_blind <- which(rownames(agg_rand) %in% blind)
+
+rownames(agg_rand)[ind_blind] <- rand
+
 
 ```
 
