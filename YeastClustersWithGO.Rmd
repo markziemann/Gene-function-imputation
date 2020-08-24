@@ -1,0 +1,323 @@
+---
+title: "Yeast Clusters with Gene Ontology"
+author: "MSoria"
+date: "8/24/2020"
+output: html_document
+---
+
+</br>
+
+***
+
+##### The following code associates annotations from Gene Ontology to different clusters from the yeast genome using data from DEE2  
+
+***
+
+</br>
+
+
+### Prerequisite libraries
+```{r Libraries, echo=TRUE}
+suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidyr), library(data.table), library(RColorBrewer), library(gplots), library(Polychrome), library(tidyverse))})
+
+```
+</br>
+
+###  1. Download and unzip the Yeast data 
+```{r Download Data, echo=TRUE}
+# put in an if statement to check if object exists
+
+if (!file.exists("Data/scerevisiae_se.tsv.bz2")){
+    download.file("http://dee2.io/mx/scerevisiae_se.tsv.bz2", 
+              destfile = "Data/scerevisiae_se.tsv.bz2")}
+
+# fread error msg: This file is very unusual: it ends abruptly without a final newline, and also its size is a multiple of 4096 bytes. Please properly end the last row with a newline using for example 'echo >> file' to avoid this  time to copy. 
+
+# needed to go back to bunzip2
+if (!file.exists("Data/scerevisiae_se.tsv")){
+    bunzip2("Data/scerevisiae_se.tsv.bz2", destname="Data/scerevisiae_se.tsv")}
+
+scerevisiae_data <- fread("Data/scerevisiae_se.tsv", sep = '\t', header = FALSE)
+
+head(scerevisiae_data)
+```
+</br>
+
+### 2. Download, read, and unzip the QC data
+```{r QC Data, echo=TRUE}
+if (!file.exists("Data/scerevisiae_qc.tsv.bz2")){
+    download.file("http://dee2.io/mx/scerevisiae_qc.tsv.bz2", 
+              destfile = "Data/scerevisiae_qc.tsv.bz2")}
+
+quality_data <- fread("Data/scerevisiae_qc.tsv.bz2", sep = '\t', col.names = c("Database", "Description", "Details"))
+
+head(quality_data)
+```
+</br>
+
+### 3. Filter and quantify databases according to QC_SUMMARY = PASS, WARN, or FAIL.  
+```{r QC Data Summary, echo=TRUE}
+
+# count the total number of QC_SUMMARY entries for checking
+qc_summary <- quality_data[quality_data$Description == 'QC_SUMMARY',]
+total_summary <- nrow(qc_summary)
+
+# count the total number of databases marked as PASS
+qc_pass <- filter(quality_data, grepl("PASS", Details))
+total_pass <- nrow(qc_pass)
+
+```
+</br>
+
+### 4. Select all the databses from scerevisiae_se.tsv with QC_SUMMARY == 'PASS' 
+```{r Filter yeast bulk data, echo=TRUE}
+
+# filter all the sample names with QC_SUMMARY == 'PASS' from step 3
+databse_pass <- filter(quality_data, grepl("PASS", Details)) %>% select(Database)
+
+# convert the rows into string and store on a list to use for filtering Yeast data
+databse_pass_list <- as.list(as.character(databse_pass$Database))
+
+# Filter Yeast data using generated list
+scerevisiae_pass <- scerevisiae_data[scerevisiae_data$V1 %in% databse_pass_list,] 
+
+# Convert format from long to wide
+scerevisiae_pass_wide <- scerevisiae_pass %>% pivot_wider(names_from = "V1", values_from = "V3")
+
+# Convert tibble to data frame and assign column 1 as rowname
+scerevisiae_pass_wide <- as.data.frame(scerevisiae_pass_wide)
+rownames(scerevisiae_pass_wide) <- scerevisiae_pass_wide[,1]
+scerevisiae_pass_wide <- scerevisiae_pass_wide[,-1]
+
+scerevisiae_pass_wide[1:10,1:6]
+
+```
+</br>
+
+### 5. Aggregate the SRR run data to SRX experiment 
+```{r SRR to SRX Aggregation, echo=TRUE}
+
+# Download and read Metadata summary
+
+if (!file.exists("Data/scerevisiae_metadata.tsv.cut")){
+    download.file("http://dee2.io/metadata/scerevisiae_metadata.tsv.cut", 
+              destfile = "Data/scerevisiae_metadata.tsv.cut")}
+    
+yeast_metadata <- read.csv("Data/scerevisiae_metadata.tsv.cut", sep = '\t')
+
+# Filter metadata to include only "passed" samples
+yeast_metadata_pass <- yeast_metadata[yeast_metadata$SRR_accession %in% databse_pass_list,]
+
+# Assign column 1 as rownames 
+rownames(yeast_metadata_pass) <- yeast_metadata_pass[,1]
+yeast_metadata_pass <- yeast_metadata_pass[,-1]
+
+# Sequencing Run aggregate function
+srx_agg <- function(x,counts="GeneCounts") {
+    IDX=which(names(x) %in% "GeneCounts")
+    mds<-x$MetadataSummary
+    n=nrow(x[[IDX]])
+    SRX_dat <- vapply(X=unique(mds$SRX_accession) ,function(srx) {
+        srrs<-rownames(mds)[which(mds$SRX_accession %in% srx)]
+        if (length(srrs)>1) {
+            rowSums(x[[IDX]][,srrs])
+        } else {
+            x[[IDX]][,srrs]
+        }
+    } , numeric(n))
+    rownames(SRX_dat) <- rownames(x[[IDX]])
+    colnames(SRX_dat) <- unique(mds$SRX_accession)
+    SRX_dat
+}
+
+# Put the filtered yeast GeneCount data and the filtered metadata dataframes into a list
+yeast_count_metadata <- list(GeneCounts = scerevisiae_pass_wide, MetadataSummary = yeast_metadata_pass)
+
+# Apply both dataframes to the function
+agg <- srx_agg(yeast_count_metadata)
+
+agg[1:10,1:6]
+
+# Check for samples with zero total counts
+colSums(agg) == 0
+
+# Histogram showing samples (columns) counts
+hist(colSums(agg), breaks = 30)
+
+# Filtering samples with more than 1 million reads
+agg_f_col <- agg[, which(colSums(agg) >= 1e6)]
+
+
+# No difference between the filtered and unfiltered columns and 
+dim(agg_f_col)
+dim(agg)
+
+# Filtering genes with more than zero counts 
+agg_f_row <- agg[which(rowSums(agg) > 0), ]
+dim(agg_f_row)
+
+
+```
+</br>
+
+### 6. Heirarchical Clustering with PASS only databases 
+
+```{r eval=FALSE, include=FALSE}
+
+myCPM <- cpm(agg)
+thresh <- myCPM > 0.5
+
+table(rowSums(thresh))
+
+# keep genes that have at least 2 TRUES in each row of thresh
+keep <- rowSums(thresh) >= 2
+# Subset the rows of data to keep the more highly expressed genes
+counts_keep <- agg[keep,]
+
+dgeObj <- DGEList(counts_keep)
+
+
+# The names argument tells the barplot to use the sample names on the x-axis
+# The las argument rotates the axis names
+barplot(dgeObj$samples$lib.size, names=colnames(dgeObj), las=2)
+title("Barplot of library sizes")
+
+# Get log2 counts per million
+logcounts <- cpm(dgeObj,log=TRUE)
+
+
+# Cluster the filtered genes with > 0 total counts
+cl <-as.dist(1-cor(t(logcounts), method="spearman"))
+hr <- hclust(cl , method="complete")
+
+# optimizing the cluster size
+mycl <- cutree(hr, h=max(hr$height/1.72))
+head(mycl)
+
+P100 <- createPalette(100,  c("#ff0000", "#00ff00", "#0000ff"))
+mycl_length <- length(unique(mycl))
+
+clusterCols <- P100[1:mycl_length]
+myClusterSideBar <- clusterCols[mycl]
+colfunc <- colorRampPalette(c("blue", "white", "red"))
+write.table(mycl,file="Data/scerevisiae_pass.txt",quote=F,sep="\t")
+
+# create a 5 x 5 inch png image
+# png("Data/yeast_heatmaps_PASS.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)          
+
+# create the heatmap
+heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
+          dendrogram="both", scale="column", col = colfunc(25), trace="none", 
+          RowSideColors= myClusterSideBar, margins = c(5,5))
+
+# dev.off()
+```
+</br>
+
+### 7. Gene Ontology Dictionary of Genes
+```{r}
+# Get the GO Annotation File (GAF) format 2.1 of yeast
+if (!file.exists("Data/scerevisiae_sgd.gaf.gz")){
+    download.file("http://current.geneontology.org/annotations/sgd.gaf.gz", 
+              destfile = "Data/scerevisiae_sgd.gaf.gz")}
+if (!file.exists("Data/scerevisiae_sgd.gaf")){
+    gunzip("Data/scerevisiae_sgd.gaf.gz", destname="Data/scerevisiae_sgd.gaf")}
+
+scerevisiae_GO <- fread("Data/scerevisiae_sgd.gaf", sep = '\t', header = FALSE)
+head(scerevisiae_GO_matrix)
+
+# Subset unique GeneIDs (V11) and GO IDs (V5) in a dataframe. Select the first gene synonym from column V11 and delete the rest. Use this as the GeneID column. Add another column with 1 in each row indicating the relationship of the Gene ID to the GO ID
+
+# ------------- Should I use the unique function?
+scerevisiae_GO_matrix <- data.frame(unique(scerevisiae_GO[,c(11,5)]))
+# ------------- Is this the right pattern for gsub?
+scerevisiae_GO_matrix$GeneID <- gsub("\\|.*", " ", scerevisiae_GO_matrix$V11)
+scerevisiae_GO_matrix$V3 <- as.numeric(paste(1, scerevisiae_GO_matrix$V3))
+scerevisiae_GO_matrix <- scerevisiae_GO_matrix[,-1]
+
+# Convert the dataframe to wide format with Gene ID as column 1 and GO ID as column names 
+scerevisiae_GO_matrix_wide <- scerevisiae_GO_matrix %>% pivot_wider(names_from = "V5", values_from = "V3")
+scerevisiae_GO_matrix_wide <- as.data.frame(scerevisiae_GO_matrix_wide)
+colnames(scerevisiae_GO_matrix_wide)[1] <- "GeneID"
+
+
+# convert NA to Zero
+scerevisiae_GO_matrix_wide[is.na(scerevisiae_GO_matrix_wide)] <- 0
+head(scerevisiae_GO_matrix_wide)
+
+```
+
+</br>
+
+### 8. Sample Cluster analysis using Cluster 1
+```{r}
+# Prepare Cluster data frame
+clusters <- as.data.frame(mycl)
+colnames(clusters) <- "ClusterNumber"
+
+# make a new column, GeneID, from rownames
+clusters$GeneID <- rownames(clusters)
+
+# remove rownames
+rownames(clusters) <- c()
+
+
+# Select all genes for cluster 
+cluster1 <- clusters[clusters$ClusterNumber == 1,] %>% select(GeneID) 
+cluster1_list <- as.list(cluster1$GeneID)
+
+cluster2 <- clusters[clusters$ClusterNumber == 2,] %>% select(GeneID) 
+cluster2_list <- as.list(cluster2$GeneID)
+
+
+# look for cluster gene match in GO dictionary and subset nonzero columns 
+cluster1_GO <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% cluster1_list,] 
+cluster1_GO_nonzero <- cluster1_GO[, !apply(cluster1_GO == 0, 2, all)]
+
+# select GO_IDs based on threshold 
+thresh <- nrow(cluster1_GO)*.60
+cluster1_GO_thresh <- cluster1_GO_nonzero[, colSums(cluster1_GO_nonzero != 0) > thresh]
+
+cluster1_GO_thresh
+
+```
+</br>
+
+### 9. Cluster analysis (with functions)
+
+```{r}
+
+GO_cluster <- function(x,y){
+  cluster <- clusters[clusters$ClusterNumber == x,] %>% select(GeneID)
+  cluster_list <- as.list(cluster$GeneID)
+  cluster_GO <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% cluster_list,] 
+  cluster_GO_nonzero <- cluster1_GO[, !apply(cluster_GO == 0, 2, all)]
+  thresh <- nrow(cluster1_GO)*y
+  cluster_GO_thresh <- cluster_GO_nonzero[, colSums(cluster_GO_nonzero != 0) > thresh]
+}
+
+clust2_sample <- GO_cluster(20, 0.60)
+
+clust2_sample
+```
+</br>
+
+### 10. Cluster analysis for all clusters
+
+```{r}
+cluster_GO_all <- list()
+total_clusters <- c(1:10)
+
+for (i in total_clusters){
+ cluster_GO_all[[i]] <- GO_cluster(i, 0.60)
+}
+
+```
+
+</br>
+
+### Session Information 
+
+```{r Session Info, echo=FALSE}
+sessionInfo()
+```
