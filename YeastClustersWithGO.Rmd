@@ -55,7 +55,7 @@ head(quality_data)
 ```
 </br>
 
-### 3. Filter and quantify databases according to QC_SUMMARY = PASS, WARN, or FAIL.  
+### 3. Filter and quantify databases according to QC_SUMMARY = PASS.  
 ```{r QC Data Summary, echo=TRUE}
 
 # count the total number of QC_SUMMARY entries for checking
@@ -147,13 +147,14 @@ hist(colSums(agg), breaks = 30)
 # Filtering samples with more than 1 million reads
 agg_f_col <- agg[, which(colSums(agg) >= 1e6)]
 
+# Filtering genes with more than zero counts 
+agg_f_row <- agg[which(rowSums(agg) > 0), ]
 
-# No difference between the filtered and unfiltered columns and 
+# No difference between the filtered and unfiltered columns  
 dim(agg_f_col)
 dim(agg)
 
-# Filtering genes with more than zero counts 
-agg_f_row <- agg[which(rowSums(agg) > 0), ]
+# Rows ommited for genes with more than zero counts
 dim(agg_f_row)
 
 
@@ -163,16 +164,24 @@ dim(agg_f_row)
 ### 6. Heirarchical Clustering with PASS only databases 
 
 ```{r eval=FALSE, include=FALSE}
-
+# Filtering to remove lowly expressed genes
 myCPM <- cpm(agg)
-thresh <- myCPM > 0.5
+thresh <- myCPM > 0.6
 
-table(rowSums(thresh))
-
-# keep genes that have at least 2 TRUES in each row of thresh
+# Keep genes that have at least 2 TRUEs in each row of thresh
 keep <- rowSums(thresh) >= 2
+
 # Subset the rows of data to keep the more highly expressed genes
 counts_keep <- agg[keep,]
+summary(keep)
+dim(counts.keep)
+
+# A CPM of 0.7 is used as it corresponds to a count of 10-15 for the library sizes in this data set. If the count is any smaller, it is considered to be very low, indicating that the associated gene is not expressed in that sample. As a general rule, a good threshold can be chosen by identifying the CPM that corresponds to a count of 10, which in this case is about 0.6. You should filter with CPMs rather than filtering on the counts directly, as the latter does not account for differences in library sizes between samples.
+
+# Check whether our threshold of 0.5 does indeed correspond to a count of about 10-15
+plot(myCPM[,1], agg[,1], ylim=c(0,50), xlim=c(0,3))
+# Add a vertical line at 0.5 CPM
+abline(v=0.6)
 
 dgeObj <- DGEList(counts_keep)
 
@@ -224,7 +233,7 @@ if (!file.exists("Data/scerevisiae_sgd.gaf")){
     gunzip("Data/scerevisiae_sgd.gaf.gz", destname="Data/scerevisiae_sgd.gaf")}
 
 scerevisiae_GO <- fread("Data/scerevisiae_sgd.gaf", sep = '\t', header = FALSE)
-head(scerevisiae_GO_matrix)
+head(scerevisiae_GO)
 
 # Subset unique GeneIDs (V11) and GO IDs (V5) in a dataframe. Select the first gene synonym from column V11 and delete the rest. Use this as the GeneID column. Add another column with 1 in each row indicating the relationship of the Gene ID to the GO ID
 
@@ -244,6 +253,8 @@ colnames(scerevisiae_GO_matrix_wide)[1] <- "GeneID"
 # convert NA to Zero
 scerevisiae_GO_matrix_wide[is.na(scerevisiae_GO_matrix_wide)] <- 0
 head(scerevisiae_GO_matrix_wide)
+
+sample_heatmap<-heatmap(as.matrix(scerevisiae_GO_matrix_wide[1:100,2:100]))
 
 ```
 
@@ -273,6 +284,8 @@ cluster2_list <- as.list(cluster2$GeneID)
 # look for cluster gene match in GO dictionary and subset nonzero columns 
 cluster1_GO <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% cluster1_list,] 
 cluster1_GO_nonzero <- cluster1_GO[, !apply(cluster1_GO == 0, 2, all)]
+cluster1_GO_nonzero
+
 
 # select GO_IDs based on threshold 
 thresh <- nrow(cluster1_GO)*.60
@@ -283,34 +296,12 @@ cluster1_GO_thresh
 ```
 </br>
 
-### 9. Cluster analysis (with functions)
+
+### 9. Pearson Correlation for the Gene Counts
 
 ```{r}
 
-GO_cluster <- function(x,y){
-  cluster <- clusters[clusters$ClusterNumber == x,] %>% select(GeneID)
-  cluster_list <- as.list(cluster$GeneID)
-  cluster_GO <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% cluster_list,] 
-  cluster_GO_nonzero <- cluster1_GO[, !apply(cluster_GO == 0, 2, all)]
-  thresh <- nrow(cluster1_GO)*y
-  cluster_GO_thresh <- cluster_GO_nonzero[, colSums(cluster_GO_nonzero != 0) > thresh]
-}
 
-clust2_sample <- GO_cluster(20, 0.60)
-
-clust2_sample
-```
-</br>
-
-### 10. Cluster analysis for all clusters
-
-```{r}
-cluster_GO_all <- list()
-total_clusters <- c(1:10)
-
-for (i in total_clusters){
- cluster_GO_all[[i]] <- GO_cluster(i, 0.60)
-}
 
 ```
 
