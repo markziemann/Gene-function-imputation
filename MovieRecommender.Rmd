@@ -3,20 +3,20 @@ title: "UBCF Movie Recommender model"
 ---
 
 ```{r}
-library("recommenderlab")
+suppressPackageStartupMessages({library("recommenderlab")})
 
 data("MovieLense")
 ```
 
 Only use users with more than 100 ratings.
-```{r}
+```{r echo=TRUE}
 MovieLense100 <- MovieLense[rowCounts(MovieLense) >100,]
 
 MovieLense100
 ```
 
 Train UBCF recommender with small training set of 50 users.
-```{r}
+```{r echo=TRUE}
 train <- MovieLense100[1:50]
 
 rec <- Recommender(train, method = "UBCF")
@@ -24,7 +24,7 @@ rec
 ```
 
 Generate top-N recommendations for new users (users 101 & 102) as per the documentation.
-```{r}
+```{r echo=TRUE}
 str(MovieLense100[101])
 head(as(MovieLense100[101], "data.frame"),9)
 pre <- predict(rec, MovieLense100[101:102], n = 5)
@@ -36,16 +36,16 @@ as(pre, "list")
 Now lets try to get some recommendations for our own film ratings. 
 
 First, create a vector of movie names.
-```{r}
+```{r echo=TRUE}
 films <- MovieLense100[100]@data@Dimnames[[2]]
 ```
 Everything is better in alphabetical order.
-```{r}
+```{r echo=TRUE}
 films <-films[order(films)]
 head(films)
 ```
 Then create a sparse matrix.
-```{r}
+```{r echo=TRUE}
 m<-matrix(0,ncol = length(films))
 colnames(m) <- films
 m[,1:5]
@@ -54,30 +54,30 @@ m
 ```
 
 Here is a vector of some films:
-```{r}
+```{r echo=TRUE}
 mymovies<-c("Toy Story (1995)","Four Rooms (1995)","Get Shorty (1995)","Copycat (1995)",
             "Twelve Monkeys (1995)","Babe (1995)","Dead Man Walking (1995)","Seven (Se7en) (1995)",
             "Usual Suspects, The (1995)","Absolute Power (1997)","Abyss, The (1989)","Young Guns II (1990)")
 ```
 Here are the ratings:
-```{r}
+```{r echo=TRUE}
 myratings<-c(5,3,4,3,5,4,1,2,2,4,5,3)
 ```
 
 Put the ratings in alphabetical order of mymovies.
-```{r}
+```{r echo=TRUE}
 myratings <-myratings[order(mymovies)]
 ```
 Put mymovies in alphabetical order.
-```{r}
+```{r echo=TRUE}
 mymovies <-mymovies[order(mymovies)]
 ```
 Clever substitution of myratings into the matrix.
-```{r}
+```{r echo=TRUE}
 m[,which(films %in% mymovies)] <- myratings
 ```
 Create a realRatingMatrix.
-```{r}
+```{r echo=TRUE}
 m <- as(m, "sparseMatrix")
 m
 r <- as(m, "realRatingMatrix")
@@ -86,29 +86,34 @@ as(pre,"list")
 ```
 
 Now try this to randomly select 100 movies and give random ratings between 1 and 5.
-```{r}
+```{r echo=TRUE}
 N=100
 mymovies <- sample(films,N)
 myratings <- sample(1:5,N,replace=TRUE)
 ```
 
 Put the ratings in alphabetical order of mymovies.
-```{r}
+```{r echo=TRUE}
 myratings <-myratings[order(mymovies)]
 ```
 Put mymovies in alphabetical order.
-```{r}
+```{r echo=TRUE}
 mymovies <-mymovies[order(mymovies)]
 ```
 Cleverly substitute myratings into the matrix.
-```{r}
+```{r echo=TRUE}
 m[,which(films %in% mymovies)] <- myratings
 ```
 Create a realRatingMatrix.
-```{r}
+```{r echo=TRUE}
 m <- as(m, "sparseMatrix")
 m
 r <- as(m, "realRatingMatrix")
 pre <- predict(rec, r, n = 20)
 as(pre,"list")
+```
+Session Information 
+
+```{r Session Info, echo=FALSE}
+sessionInfo()
 ```
