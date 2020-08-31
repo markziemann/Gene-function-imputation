@@ -17,7 +17,7 @@ MovieLense100
 
 Train UBCF recommender with small training set of 50 users.
 ```{r echo=TRUE}
-train <- MovieLense100[1:50]
+train <- MovieLense100[1:358]
 
 rec <- Recommender(train, method = "UBCF")
 rec
