@@ -1,0 +1,79 @@
+---
+title: 'IBCF Movie Recommender Model: Our Ratings'
+---
+
+```{r}
+suppressPackageStartupMessages({library("recommenderlab")})
+
+data("MovieLense")
+```
+
+Only use users with more than 100 ratings.
+```{r echo=TRUE}
+MovieLense100 <- MovieLense[rowCounts(MovieLense) >100,]
+
+MovieLense100
+```
+
+Train UBCF recommender with training set of all users.
+```{r echo=TRUE}
+train <- MovieLense100[1:358]
+
+rec <- Recommender(train, method = "IBCF")
+rec
+```
+
+Now lets try to get some recommendations for our own film ratings. 
+
+First, create a vector of movie names.
+```{r echo=TRUE}
+films <- MovieLense100[100]@data@Dimnames[[2]]
+```
+Everything is better in alphabetical order.
+```{r echo=TRUE}
+films <-films[order(films)]
+head(films)
+```
+
+Then create a sparse matrix.
+```{r echo=TRUE}
+m<-matrix(0,ncol = length(films))
+colnames(m) <- films
+m[,1:5]
+
+m
+```
+
+Here is a vector of some films:
+```{r echo=TRUE}
+mymovies<-c("Toy Story (1995)","Lion King, The (1994)","Aladdin (1992)","Snow White and the Seven Dwarfs (1937)","Aristocats, The (1970)","All Dogs Go to Heaven 2 (1996)","Wallace & Gromit: The Best of Aardman Animation (1996)","Wrong Trousers, The (1993)","Grand Day Out, A (1992)","Akira (1988)","Beavis and Butt-head Do America (1996)","Pinocchio (1940)","Close Shave, A (1995)","Cinderella (1950)","Alice in Wonderland (1951)","Aladdin and the King of Thieves (1996)","Transformers: The Movie, The (1986)","Fantasia (1940)","James and the Giant Peach (1996)","Anastasia (1997)","GoldenEye (1995)","Get Shorty (1995)","From Dusk Till Dawn (1996)","Muppet Treasure Island (1996)","Braveheart (1995)","Rumble in the Bronx (1995)","Bad Boys (1995)","Apollo 13 (1995)","Batman Forever (1995)","Desperado (1995)","Strange Days (1995)","Star Wars (1977)","Natural Born Killers (1994)","Outbreak (1995)","Stargate (1994)","Crow, The (1994)","Fugitive, The (1993)","Hot Shots! Part Deux (1993)","Jurassic Park (1993)","Terminator 2: Judgment Day (1991)")
+```
+
+Here are the ratings: 
+```{r echo=TRUE}
+myratings<-c(5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)
+```
+
+Put the ratings in alphabetical order of mymovies.
+```{r echo=TRUE}
+myratings <-myratings[order(mymovies)]
+```
+
+Put mymovies in alphabetical order.
+```{r echo=TRUE}
+mymovies <-mymovies[order(mymovies)]
+```
+
+Clever substitution of myratings into the matrix.
+```{r echo=TRUE}
+m[,which(films %in% mymovies)] <- myratings
+```
+
+Create a realRatingMatrix.
+```{r echo=TRUE}
+m <- as(m, "sparseMatrix")
+m
+r <- as(m, "realRatingMatrix")
+pre <- predict(rec, r, n = 20)
+as(pre,"list")
+```
