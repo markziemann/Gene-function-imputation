@@ -1,0 +1,66 @@
+---
+title: "Bioconductor clusterProfiler Package Sample Use Case"
+author: "M.Soria"
+date: "9/11/2020"
+output: html_document
+---
+
+</br>
+
+***
+
+##### The following code is a sample enrichment analysis done on a **pre-clustered** set of Sacharomyces cerevisiae genes from the [dee2 repository](http://dee2.io/) using the clusterProfiler package from Bioconducter.   
+
+##### Links about the Package:
+* [Package Bioconducter release page](https://bioconductor.org/packages/release/bioc/html/clusterProfiler.html)
+* [Package user manual (PDF)](https://bioconductor.org/packages/release/bioc/manuals/clusterProfiler/man/clusterProfiler.pdf)
+* [Package "book" (html)](http://yulab-smu.top/clusterProfiler-book/chapter1.html)
+
+##### Other interesting Links mentioned below
+* [*1 List of OrgDbs by organism](http://bioconductor.org/packages/release/BiocViews.html#___OrgDb)
+* [*2 AnnotationHub vignette](http://129.217.206.11/packages/3.7/workflows/vignettes/annotation/inst/doc/Annotation_Resources.html#using-annotationhub)
+
+***
+
+</br>
+
+
+### 1. Prerequisite libraries
+```{r Libraries, echo=TRUE}
+suppressPackageStartupMessages({c(library(org.Sc.sgd.db), library("clusterProfiler"), library("enrichplot"))})
+
+```
+</br>
+
+### 2. Gene Enrichment Analysis 
+```{r echo=TRUE}
+# Make an object containing a list for geneIDs of interest. In this example, we will be using the Ensembl geneID format
+genesOfInterest <- c("YDL248W", "YDR542W", "YOL161C", "YOL155C", "YOR032C", "YGL261C", "RDN5-1", "YLR349W", "YPL062W", "YPL021W", "YMR321C", "YMR322C", "YMR323W", "YMR325W", "YBL108C-A", "YBL029W", "YBR090C", "YBR196C-A", "YNL143C", "YNL067W-A", "YJR159W", "YJR160C", "YJR161C", "YKL097C", "YER091C-A", "YHR145C", "YIL169C", "YIR043C", "YIR044C", "YFL062W", "YAL068C", "YAR066W", "YAR068W")
+
+# The org.Sc.sgd.db is the organism-specific database for yeast. You can find the list of all OrgDbs by organism using *1 and use it directly as shown here or you can do an in-code-query of the organism using a package called AnnotationHub. Tutorials can be found in chapters 4 and five using *2 above.
+
+
+
+# Here we can see all the keyTypes of the database. This will be used as one of the arguments for the enrichGO function. Since our genesOfInterest object uses the Ensembl geneID format, the appropriate keyType should be "ENSEMBL" as shown in the yeast_CP_go line
+keytypes(org.Sc.sgd.db)
+
+
+#---------GO Analysis using clusterprofiler
+
+yeast_CP_go <- enrichGO(genesOfInterest, "org.Sc.sgd.db", keyType = "ENSEMBL", ont = "ALL")
+# Transform object into a dataframe for easier viewing
+yeast_CP_go_df <- as.data.frame(yeast_CP_go)
+yeast_CP_go_df
+
+# -------Visualization using dot plot
+emapplot(yeast_CP_go)
+
+```
+
+</br>
+
+### Session Information 
+
+```{r Session Info, echo=FALSE}
+sessionInfo()
+```

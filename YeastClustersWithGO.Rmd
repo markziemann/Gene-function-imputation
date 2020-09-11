@@ -200,6 +200,12 @@ dgeObj <- calcNormFactors(dgeObj)
 # Get log2 counts per million
 logcounts <- cpm(dgeObj,log=TRUE)
 
+# Check distributions of samples using boxplots
+boxplot(logcounts, xlab="", ylab="Log2 counts per million",las=2)
+# Let's add a blue horizontal line that corresponds to the median logCPM
+abline(h=median(logcounts),col="blue")
+title("Boxplots of logCPMs (unnormalised)")
+
 ```
 </br>
 
@@ -404,8 +410,13 @@ goGreater
 #---------Imputation using clusterprofiler
 library("clusterProfiler")
 
-yeast_CP_go <- enrichGO(genesOfInterest, "org.Sc.sgd.db", keyType = "ENSEMBL", ont = "ALL")
+
+background_genes <- clusters[clusters$ClusterNumber !=1,]
+background_geneIDs <- rownames(agg)
+  
+yeast_CP_go <- enrichGO(genesOfInterest, "org.Sc.sgd.db", keyType = "ENSEMBL", ont = "ALL", universe = background_geneIDs)
 yeast_CP_go_df <- as.data.frame(yeast_CP_go)
+yeast_CP_go_df
 ```
 
 </br>
