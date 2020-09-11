@@ -18,7 +18,7 @@ output: html_document
 
 ### Prerequisite libraries
 ```{r Libraries, echo=TRUE}
-suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidyr), library(data.table), library(RColorBrewer), library(gplots), library(Polychrome), library(tidyverse), library(edgeR), library(GO.db), library(gage), library(gProfileR))})
+suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidyr), library(data.table), library(RColorBrewer), library(gplots), library(Polychrome), library(tidyverse), library(edgeR), library(GO.db), library(gage), library(gProfileR), library(factoextra), library(NbClust))})
 
 ```
 </br>
@@ -161,13 +161,17 @@ dim(agg_f_row)
 ```
 </br>
 
-### 6. Heirarchical Clustering with PASS only databases 
+### 6. Normalisation of Data 
 
 ```{r eval=FALSE, include=FALSE}
 # NORMALISATION FOR LIBRARY SIZE BIAS (cpm)
-# Filtering to remove lowly expressed genes
 myCPM <- cpm(agg)
+# add a small number to the entire dataframe to account for zero reads
+myCPM <- myCPM + 0.01
+# Filtering to remove lowly expressed genes
 thresh <- myCPM > 0.6
+# check if there are zero values. Result should be FALSE.
+all(apply(apply(myCPM, 2, function(x) x==0), 2, any))
 
 # Keep genes that have at least 2 TRUEs in each row of thresh
 keep <- rowSums(thresh) >= 2
@@ -190,14 +194,12 @@ dgeObj <- DGEList(counts_keep)
 
 #NORMALISATION FOR COMPOSITION BIAS (TMM normalisation)
 # Apply normalisation to DGEList object
-dgeObj <- calcNormFactors(dgeObj)
+dgeObj <- calcNormFactors(dgeObj) 
 # dgeObj$samples
 
 # Get log2 counts per million
 logcounts <- cpm(dgeObj,log=TRUE)
 
-
-# dev.off()
 ```
 </br>
 
@@ -310,22 +312,47 @@ cluster1_GO_thresh
 
 </br>
 
-### 9. Gene Enrichment Analysis using goProfileR
+### 9. Gene Enrichment Analysis 
 ```{r echo=TRUE}
-
+# ---------Functional Enrichment Analysis using using goProfileR
 # make a list for genes of interest
 cluster_1 <- cl_mat[rownames(cl_mat) %in% cluster1_list,]
 genesOfInterest <- rownames(cluster_1)
+
+is_blind <- genesOfInterest[genesOfInterest %in% dict_blind$blind]
+
+# Correlation in Cluster 1
+corr_cluster1 <- cor(t(cluster_1))
+hist(corr_cluster1)
+
+# weighted correlation for Cluster 1
+cluster1_GO_terms <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% genesOfInterest,]
+rownames(cluster1_GO_terms)<- cluster1_GO_terms[,1] 
+cluster1_GO_terms[,1] = NULL
+
+cluster1_GO_terms <- cluster1_GO_terms[,which(colSums(cluster1_GO_terms) > 0)]
+ 
+
+# ---note: how to apply this in all blind genes in a cluster
+# ---result: a list of vector per gene in the cluster containing the GO terms
+blind_gene <- is_blind[1]
+corr_value_blind1 <- corr_cluster1[blind_gene,]
+corr_value_blind1_df <- as.data.frame(corr_value_blind1)
+weighted_go_cluster1 <- merge(corr_value_blind1_df, cluster1_GO_terms)
+weighted_go_cluster1 <- weighted_go_cluster1[,1]*weighted_go_cluster1[,2:ncol(weighted_go_cluster1)]
+
+normalized_weighted_go_cluster1 <- colSums(weighted_go_cluster1)/nrow(weighted_go_cluster1) 
+hist(normalized_weighted_go_cluster1)
+
+# maybe values bet 0.3 and 0.1
+imputed_GO_terms <- names(which(normalized_weighted_go_cluster1 > 0.1))
+
+
 
 # Gene enrichment query
 goResults_1 <- gprofiler(query = genesOfInterest, 
                      organism = 'scerevisiae',
                      hier_filtering = 'none')
-
-# goResults <- gost(query = genesOfInterest, 
-#                      organism = 'scerevisiae')
-# goResults$result$parents
-
 
 ## Subset and reorder gProfiler results to only include columns of interest
 gprofiler_results_oe_reordered <- goResults_1[, c("term.id", "domain", "term.name", "p.value", "overlap.size", "term.size", "intersection")]
@@ -340,7 +367,8 @@ gprofiler_results_oe_GOs <- gprofiler_results_oe_reordered[grep('GO:', gprofiler
 write.csv(gprofiler_results_oe_GOs, 
             "Data/gprofiler_cluster1.csv")
 
-#-----------------------from gage Package--------------------------
+
+# --------Over-representation analysis of biological processes 
 # perform Gene Set Enrichment Analysis (GSEA) using gage package
 library(org.Sc.sgd.db)
 org.Sc.sgd()
@@ -370,25 +398,87 @@ goTermNames <- lapply(mget(rownames(goGreater), GOTERM), function(go) go@Term)
 goGreater$Term <- goTermNames[rownames(goGreater)]
 goGreater
 
-GSEA_heatmap <- heatmap(as.matrix(goGreater[,6:4840]))
+# GSEA_heatmap <- heatmap(as.matrix(goGreater[,6:4840]))
 
-goGreater[,1:6]
-a$DRX021534
-grep("^YDL248W$", rownames(a))
-a <- as.data.frame(logcounts)
-a[1,1]
-goMapping$`GO:0006810`
 
+#---------Imputation using clusterprofiler
+library("clusterProfiler")
+
+yeast_CP_go <- enrichGO(genesOfInterest, "org.Sc.sgd.db", keyType = "ENSEMBL", ont = "ALL")
+yeast_CP_go_df <- as.data.frame(yeast_CP_go)
 ```
 
 </br>
 
 
-### 11. Pearson Correlation for the Gene Counts
+### 10. Assessing clustering tendency
 
 ```{r}
 
-fdr <- p.adjust(pvalue,"fdr")
+# Hopkins statistic: If the value of Hopkins statistic is close to 1 (far above 0.5), 
+# then we can conclude that the dataset is significantly clusterable
+
+# Visual approach: The visual approach detects the clustering tendency by counting 
+# the number of square shaped dark (or colored) blocks along the diagonal in 
+# the ordered dissimilarity image.
+
+gradient.color <- list(low = "steelblue",  high = "white")
+
+# create a 5 x 5 inch png image
+png("Data/clustering_tendency_PASS.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)          
+logcounts %>% get_clust_tendency(n = nrow(logcounts)-1, gradient = gradient.color)
+
+dev.off()
+```
+</br>
+
+### 11. K-means Clustering
+
+```{r}
+# determining the number of clusters (K) using NbClust package
+
+#val_K_clust <- NbClust(logcounts, min.nc=1, max.nc=100, method="kmeans")
+num_K_clust <- fviz_nbclust(logcounts, FUNcluster = kmeans, method = "wss", print.summary = TRUE)
+
+# K-means Clustering
+
+# As k-means clustering algorithm starts with k randomly selected centroids, it’s always recommended to use the set.seed() function in order to set a seed for R’s random number generator
+
+set.seed(123)
+km.res_100 <- kmeans(logcounts, 100, nstart = 25, iter.max = 50)
+
+png("Data/K_means_PASS.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+fviz_cluster(km.res, data = logcounts, geom="point")
+dev.off()
+```
+</br>
+
+### 12. Blinding genes using random strings
+
+```{r}
+library("stringi")
+
+frac_blind <- 0.10
+number_of_genes <- round(nrow(agg)*frac_blind)
+
+blind <- sample(rownames(agg), number_of_genes)
+
+rand <- stri_rand_strings(number_of_genes, 15, pattern = "[A-Za-z]")
+rand <- paste("blind_", rand, sep = "")
+dict_blind <- data.frame(blind, rand)
+
+agg_rand <- agg
+
+ind_blind <- which(rownames(agg_rand) %in% blind)
+
+rownames(agg_rand)[ind_blind] <- rand
+
+```
+</br>
+
+### 13. Weighted Correlation for Cluster 1
+
+```{r}
 
 ```
 
