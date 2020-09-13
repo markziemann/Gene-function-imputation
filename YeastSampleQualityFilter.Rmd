@@ -225,7 +225,6 @@ dev.off()
 
 ### 8. row scale
 
-```{r}
 ```{r eval=FALSE, include=FALSE}
 
 myCPM <- cpm(agg)
