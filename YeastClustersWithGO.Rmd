@@ -18,7 +18,7 @@ output: html_document
 
 ### Prerequisite libraries
 ```{r Libraries, echo=TRUE}
-suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidyr), library(data.table), library(RColorBrewer), library(gplots), library(Polychrome), library(tidyverse), library(edgeR), library(GO.db), library(gage), library(gProfileR), library(factoextra), library(NbClust))})
+suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidyr), library(data.table), library(RColorBrewer), library(gplots), library(Polychrome), library(tidyverse), library(edgeR), library(GO.db), library(gage), library(gProfileR), library(factoextra), library(NbClust), library(org.Sc.sgd.db),library(stringi))})
 
 ```
 </br>
@@ -73,7 +73,7 @@ total_pass <- nrow(qc_pass)
 ```{r Filter yeast bulk data, echo=TRUE}
 
 # filter all the sample names with QC_SUMMARY == 'PASS' from step 3
-databse_pass <- filter(quality_data, grepl("PASS", Details)) %>% select(Database)
+databse_pass <- filter(quality_data, grepl("PASS", Details)) 
 
 # convert the rows into string and store on a list to use for filtering Yeast data
 databse_pass_list <- as.list(as.character(databse_pass$Database))
@@ -157,6 +157,7 @@ dim(agg)
 # Rows ommited for genes with more than zero counts
 dim(agg_f_row)
 
+hist(as.numeric(scerevisiae_pass_wide))
 
 ```
 </br>
@@ -177,9 +178,9 @@ all(apply(apply(myCPM, 2, function(x) x==0), 2, any))
 keep <- rowSums(thresh) >= 2
 
 # Subset the rows of data to keep the more highly expressed genes
-counts_keep <- agg[keep,]
+counts_keep <- myCPM[keep,]
 summary(keep)
-dim(counts.keep)
+dim(counts_keep)
 
 # A CPM of 0.6 is used as it corresponds to a count of 10-15 for the library sizes in this data set. If the count is any smaller, it is considered to be very low, indicating that the associated gene is not expressed in that sample. As a general rule, a good threshold can be chosen by identifying the CPM that corresponds to a count of 10, which in this case is about 0.6. You should filter with CPMs rather than filtering on the counts directly, as the latter does not account for differences in library sizes between samples.
 
@@ -200,12 +201,9 @@ dgeObj <- calcNormFactors(dgeObj)
 # Get log2 counts per million
 logcounts <- cpm(dgeObj,log=TRUE)
 
-# Check distributions of samples using boxplots
-boxplot(logcounts, xlab="", ylab="Log2 counts per million",las=2)
-# Let's add a blue horizontal line that corresponds to the median logCPM
-abline(h=median(logcounts),col="blue")
-title("Boxplots of logCPMs (unnormalised)")
-
+# Check distributions of samples
+hist(logcounts)
+hist(counts_keep)
 ```
 </br>
 
@@ -220,7 +218,7 @@ hr <- hclust(cl , method="complete")
 cl_mat <- as.matrix(cl)
 
 # optimizing the cluster size
-mycl <- cutree(hr, h=max(hr$height/1.611))
+mycl <- cutree(hr, h=max(hr$height/1.64))
 head(mycl)
 
 if (!exists("P100")){
@@ -234,14 +232,14 @@ if (!file.exists("Data/scerevisiae_se.tsv")){
   write.table(mycl,file="Data/scerevisiae_pass.txt",quote=F,sep="\t")}
 
 # create a 5 x 5 inch png image
-# png("Data/yeast_heatmaps_PASS_normalization2.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)          
+png("Data/yeast_heatmaps_PASS_normalization3.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)          
 
 # create the heatmap
 heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
           dendrogram="both", scale="column", col = colfunc(25), trace="none", 
           RowSideColors= myClusterSideBar, margins = c(5,5))
 
-# dev.off()
+dev.off()
 ```
 </br>
 
@@ -295,10 +293,10 @@ rownames(clusters) <- c()
 
 
 # Select all genes for cluster 
-cluster1 <- clusters[clusters$ClusterNumber == 1,] %>% select(GeneID) 
+cluster1 <- clusters[clusters$ClusterNumber == 1,] 
 cluster1_list <- as.list(cluster1$GeneID)
 
-cluster2 <- clusters[clusters$ClusterNumber == 2,] %>% select(GeneID) 
+cluster2 <- clusters[clusters$ClusterNumber == 2,]  
 cluster2_list <- as.list(cluster2$GeneID)
 
 
@@ -315,10 +313,32 @@ cluster1_GO_thresh <- cluster1_GO_nonzero[, colSums(cluster1_GO_nonzero != 0) > 
 cluster1_GO_thresh
 
 ```
+</br>
+
+### 11. Blinding genes using random strings
+
+```{r}
+
+frac_blind <- 0.10
+number_of_genes <- round(nrow(agg)*frac_blind)
+
+blind <- sample(rownames(agg), number_of_genes)
+
+rand <- stri_rand_strings(number_of_genes, 15, pattern = "[A-Za-z]")
+rand <- paste("blind_", rand, sep = "")
+dict_blind <- data.frame(blind, rand)
+
+agg_rand <- agg
+
+ind_blind <- which(rownames(agg_rand) %in% blind)
+
+rownames(agg_rand)[ind_blind] <- rand
+
+```
 
 </br>
 
-### 9. Gene Enrichment Analysis 
+### 12. Gene Enrichment Analysis 
 ```{r echo=TRUE}
 # ---------Functional Enrichment Analysis using using goProfileR
 # make a list for genes of interest
@@ -330,10 +350,10 @@ genesOfInterest <- rownames(cluster_1)
 # Correlation in Cluster 1
 corr_cluster1 <- cor(t(cluster_1))
 hist(corr_cluster1)
-
+hist(logcounts)
 #---function (correlation per cluster)
 # x = logcounts (normalized gene counts from RNA seq)
-# y = y = clusters (matrix of genes w/ cluster number)
+# y = clusters (matrix of genes w/ cluster number)
 # clust_total = total number of clusters
 
 corr_per_clust <- function(x, y, clust_total){
@@ -422,68 +442,64 @@ imputed_GO_terms <- names(which(normalized_weighted_go_cluster1 > 0.1))
 
 
 
-# Gene enrichment query
-goResults_1 <- gprofiler(query = genesOfInterest, 
-                     organism = 'scerevisiae',
-                     hier_filtering = 'none')
-
-## Subset and reorder gProfiler results to only include columns of interest
-gprofiler_results_oe_reordered <- goResults_1[, c("term.id", "domain", "term.name", "p.value", "overlap.size", "term.size", "intersection")]
-
-## Order the results by p-adjusted value
-gprofiler_results_oe_reordered <- gprofiler_results_oe_reordered[order(gprofiler_results_oe_reordered$p.value), ]
-
-## Extract only the 'GO' terms from the results
-gprofiler_results_oe_GOs <- gprofiler_results_oe_reordered[grep('GO:', gprofiler_results_oe_reordered$term.id), ]
-
-## Write the enriched GO results to file
-write.csv(gprofiler_results_oe_GOs, 
-            "Data/gprofiler_cluster1.csv")
+# # Gene enrichment query
+# goResults_1 <- gprofiler(query = genesOfInterest, 
+#                      organism = 'scerevisiae',
+#                      hier_filtering = 'none')
+# 
+# ## Subset and reorder gProfiler results to only include columns of interest
+# gprofiler_results_oe_reordered <- goResults_1[, c("term.id", "domain", "term.name", "p.value", "overlap.size", "term.size", "intersection")]
+# 
+# ## Order the results by p-adjusted value
+# gprofiler_results_oe_reordered <- gprofiler_results_oe_reordered[order(gprofiler_results_oe_reordered$p.value), ]
+# 
+# ## Extract only the 'GO' terms from the results
+# gprofiler_results_oe_GOs <- gprofiler_results_oe_reordered[grep('GO:', gprofiler_results_oe_reordered$term.id), ]
+# 
+# ## Write the enriched GO results to file
+# write.csv(gprofiler_results_oe_GOs, 
+#             "Data/gprofiler_cluster1.csv")
 
 
 # --------Over-representation analysis of biological processes 
 # perform Gene Set Enrichment Analysis (GSEA) using gage package
-library(org.Sc.sgd.db)
-org.Sc.sgd()
 
+# columns(org.Sc.sgd.db)
+# keys(org.Sc.sgd.db)
+# keytypes(org.Sc.sgd.db)
+# 
+# # The input to gage must be Entrez identifiers so we first need to map our gene symbols to Entrez
+# ann <- mapIds(org.Sc.sgd.db, keys=rownames(cluster_1), column="ENTREZID", keytype="ENSEMBL")
+# cluster1_non_na <- names(!is.na(ann))
+# fc <- logcounts[rownames(logcounts) %in% cluster1_non_na,]
+# 
+# table(is.na(fc))
+# 
+# # Create a mapping between gene identifiers and GO terms.
+# allGo <- as.list(GOTERM)
+# bp <- Filter(function(go) go@Ontology == 'BP', allGo)
+# goMapping <- mget(names(bp), org.Sc.sgdGO2ALLORFS, ifnotfound=NA)
+# 
+# # gene set enrichment analysis
+# goFc <- gage(fc, goMapping)
+# goGreater <- as.data.frame(goFc$greater)
+# goGreater <- goGreater[goGreater$q.val < 0.01 & !is.na(goGreater$q.val),]
+# goTermNames <- lapply(mget(rownames(goGreater), GOTERM), function(go) go@Term)
+# goGreater$Term <- goTermNames[rownames(goGreater)]
+# goGreater
 
-columns(org.Sc.sgd.db)
-keys(org.Sc.sgd.db)
-keytypes(org.Sc.sgd.db)
-
-# The input to gage must be Entrez identifiers so we first need to map our gene symbols to Entrez
-ann <- mapIds(org.Sc.sgd.db, keys=rownames(cluster_1), column="ENTREZID", keytype="ENSEMBL")
-cluster1_non_na <- names(!is.na(ann))
-fc <- logcounts[rownames(logcounts) %in% cluster1_non_na,]
-
-table(is.na(fc))
-
-# Create a mapping between gene identifiers and GO terms.
-allGo <- as.list(GOTERM)
-bp <- Filter(function(go) go@Ontology == 'BP', allGo)
-goMapping <- mget(names(bp), org.Sc.sgdGO2ALLORFS, ifnotfound=NA)
-
-# gene set enrichment analysis
-goFc <- gage(fc, goMapping)
-goGreater <- as.data.frame(goFc$greater)
-goGreater <- goGreater[goGreater$q.val < 0.01 & !is.na(goGreater$q.val),]
-goTermNames <- lapply(mget(rownames(goGreater), GOTERM), function(go) go@Term)
-goGreater$Term <- goTermNames[rownames(goGreater)]
-goGreater
-
-# GSEA_heatmap <- heatmap(as.matrix(goGreater[,6:4840]))
 
 
 #---------Imputation using clusterprofiler
-library("clusterProfiler")
-
-
-background_genes <- clusters[clusters$ClusterNumber !=1,]
-background_geneIDs <- rownames(agg)
-  
-yeast_CP_go <- enrichGO(genesOfInterest, "org.Sc.sgd.db", keyType = "ENSEMBL", ont = "ALL", universe = background_geneIDs)
-yeast_CP_go_df <- as.data.frame(yeast_CP_go)
-yeast_CP_go_df
+# library("clusterProfiler")
+# 
+# 
+# background_genes <- clusters[clusters$ClusterNumber !=1,]
+# background_geneIDs <- rownames(agg)
+#   
+# yeast_CP_go <- enrichGO(genesOfInterest, "org.Sc.sgd.db", keyType = "ENSEMBL", ont = "ALL", universe = background_geneIDs)
+# yeast_CP_go_df <- as.data.frame(yeast_CP_go)
+# yeast_CP_go_df
 ```
 
 </br>
@@ -512,7 +528,7 @@ dev.off()
 
 ### 11. K-means Clustering
 
-```{r}
+```{r echo=TRUE}
 # determining the number of clusters (K) using NbClust package
 
 #val_K_clust <- NbClust(logcounts, min.nc=1, max.nc=100, method="kmeans")
@@ -531,34 +547,11 @@ dev.off()
 ```
 </br>
 
-### 12. Blinding genes using random strings
-
-```{r}
-library("stringi")
-
-frac_blind <- 0.10
-number_of_genes <- round(nrow(agg)*frac_blind)
-
-blind <- sample(rownames(agg), number_of_genes)
-
-rand <- stri_rand_strings(number_of_genes, 15, pattern = "[A-Za-z]")
-rand <- paste("blind_", rand, sep = "")
-dict_blind <- data.frame(blind, rand)
-
-agg_rand <- agg
-
-ind_blind <- which(rownames(agg_rand) %in% blind)
-
-rownames(agg_rand)[ind_blind] <- rand
+### 12. Applying Function for K-means results
+```{r echo=TRUE}
 
 ```
-</br>
 
-### 13. Weighted Correlation for Cluster 1
-
-```{r}
-
-```
 
 </br>
 
