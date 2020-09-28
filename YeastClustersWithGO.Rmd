@@ -157,7 +157,6 @@ dim(agg)
 # Rows ommited for genes with more than zero counts
 dim(agg_f_row)
 
-hist(as.numeric(scerevisiae_pass_wide))
 
 ```
 </br>
@@ -204,6 +203,10 @@ logcounts <- cpm(dgeObj,log=TRUE)
 # Check distributions of samples
 hist(logcounts)
 hist(counts_keep)
+
+all(apply(apply(logcounts, 2, function(x) x==0), 2, any))
+# Comment: should we remove the huge spike of less than 5 values?
+
 ```
 </br>
 
@@ -214,8 +217,6 @@ hist(counts_keep)
 # Applying Hierarchical Clustering after normalization
 cl <-as.dist(1-cor(t(logcounts), method="spearman"))
 hr <- hclust(cl , method="complete")
-
-cl_mat <- as.matrix(cl)
 
 # optimizing the cluster size
 mycl <- cutree(hr, h=max(hr$height/1.64))
@@ -245,7 +246,7 @@ dev.off()
 
 
 
-### 9. Gene Ontology Gene Matrix 
+### 9. Gene Ontology and Gene Matrix 
 ```{r}
 # Get the GO Annotation File (GAF) format 2.1 of yeast
 if (!file.exists("Data/scerevisiae_sgd.gaf.gz")){
@@ -279,46 +280,10 @@ sample_heatmap<-heatmap(as.matrix(scerevisiae_GO_matrix_wide[1:100,2:100]))
 ```
 </br>
 
-### 10. Sample Cluster analysis using Cluster 1
-```{r}
-# Prepare Cluster data frame
-clusters <- as.data.frame(mycl)
-colnames(clusters) <- "ClusterNumber"
-
-# make a new column, GeneID, from rownames
-clusters$GeneID <- rownames(clusters)
-
-# remove rownames
-rownames(clusters) <- c()
-
-
-# Select all genes for cluster 
-cluster1 <- clusters[clusters$ClusterNumber == 1,] 
-cluster1_list <- as.list(cluster1$GeneID)
-
-cluster2 <- clusters[clusters$ClusterNumber == 2,]  
-cluster2_list <- as.list(cluster2$GeneID)
-
-
-# look for cluster gene match in GO dictionary and subset nonzero columns 
-cluster1_GO <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% cluster1_list,] 
-cluster1_GO_nonzero <- cluster1_GO[, !apply(cluster1_GO == 0, 2, all)]
-cluster1_GO_nonzero
-
-
-# select GO_IDs based on threshold 
-thresh <- nrow(cluster1_GO)*.60
-cluster1_GO_thresh <- cluster1_GO_nonzero[, colSums(cluster1_GO_nonzero != 0) > thresh]
-
-cluster1_GO_thresh
-
-```
-</br>
-
-### 11. Blinding genes using random strings
+### 10. Blinding genes using random strings
 
 ```{r}
-
+#Fraction of the total number of genes to be blinded
 frac_blind <- 0.10
 number_of_genes <- round(nrow(agg)*frac_blind)
 
@@ -338,20 +303,44 @@ rownames(agg_rand)[ind_blind] <- rand
 
 </br>
 
-### 12. Gene Enrichment Analysis 
-```{r echo=TRUE}
-# ---------Functional Enrichment Analysis using using goProfileR
-# make a list for genes of interest
+### 11. Cluster Analysis
+```{r}
+# Prepare Cluster data frame
+clusters <- as.data.frame(mycl)
+colnames(clusters) <- "ClusterNumber"
 
+# make a new column, GeneID, from rownames
+clusters$GeneID <- rownames(clusters)
+
+# remove rownames
+rownames(clusters) <- c()
+
+
+# Grouping genes by cluster 
+cluster1 <- clusters[clusters$ClusterNumber == 1,] 
+cluster1_list <- as.list(cluster1$GeneID)
+
+
+# look for cluster gene match in GO dictionary and subset nonzero columns 
+cluster1_GO <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% cluster1_list,] 
+cluster1_GO_nonzero <- cluster1_GO[, !apply(cluster1_GO == 0, 2, all)]
+cluster1_GO_nonzero
+
+
+# cl (object in wich the herarchical clustering data was saved)
+# cl_mat <- as.matrix(cl)
 #cluster_1 <- cl_mat[rownames(cl_mat) %in% cluster1_list,]
-cluster_1 <- logcounts[rownames(logcounts) %in% cluster1_list,]
-genesOfInterest <- rownames(cluster_1)
+# Comment: this was used initially as data input for the cluster_1 object but I replaced it with the normalised count data (logcounts)
+
 
 # Correlation in Cluster 1
+cluster_1 <- logcounts[rownames(logcounts) %in% cluster1_list,]
 corr_cluster1 <- cor(t(cluster_1))
 hist(corr_cluster1)
 hist(logcounts)
-#---function (correlation per cluster)
+
+
+#---function (correlation per cluster) where:
 # x = logcounts (normalized gene counts from RNA seq)
 # y = clusters (matrix of genes w/ cluster number)
 # clust_total = total number of clusters
@@ -378,6 +367,7 @@ cluster1_GO_terms[,1] = NULL
 
 cluster1_GO_terms <- cluster1_GO_terms[,which(colSums(cluster1_GO_terms) > 0)]
 
+
 #---function (GO terms per cluster)
 # x = scerevisiae_GO_matrix_wide (matrix of genes belonging to a GO term)
 # y = clusters (matrix of genes w/ cluster number)
@@ -401,11 +391,11 @@ GOterms_allClusters <- GO_per_cl(scerevisiae_GO_matrix_wide, clusters, 100)
 
  
 # weighted correlation for Cluster 1
-
 # ---note: how to apply this in all blind genes in a cluster
 # ---result: a list of vector per gene in the cluster containing the GO terms
-is_blind <- genesOfInterest[genesOfInterest %in% dict_blind$blind]
 
+genesOfInterest <- rownames(cluster_1)
+is_blind <- genesOfInterest[genesOfInterest %in% dict_blind$blind]
 blind_gene <- is_blind[1]
 corr_value_blind1 <- corr_cluster1[blind_gene,]
 corr_value_blind1_df <- as.data.frame(corr_value_blind1)
@@ -416,9 +406,10 @@ normalized_weighted_go_cluster1 <- colSums(weighted_go_cluster1)/nrow(weighted_g
 hist(normalized_weighted_go_cluster1)
 
 
-#---function (per gene in a cluster)
+#---function (weighted correlation per gene in a cluster) where:
 # gene_list = list of genes to be correlated; corr_cl = correlation values for cluster
 # cl_GO = GO terms for cluster
+
 wcorr_cluster <- function(gene_list, corr_cl, cl_GO){
   wcorr_result <- list()
   
@@ -437,75 +428,118 @@ wcorr_cluster <- function(gene_list, corr_cl, cl_GO){
 cluster1_wGO <- wcorr_cluster(is_blind, corr_cluster1, cluster1_GO_terms)
 
 
-# maybe values bet 0.3 and 0.1
+
+# Determining threshold based on histogram
+hist(cluster1_wGO$YDL024C)
 imputed_GO_terms <- names(which(normalized_weighted_go_cluster1 > 0.1))
 
+# Convert output into a data frame with columns as GO terms and rows as gene names
+cluster1_wGO_df <- as.data.frame(do.call(rbind, cluster1_wGO))
+
+# using 0.1 as threshold
+Clust1_threshold <- 0.1
+imputed_Clust1_df <- as.data.frame(sapply(cluster1_wGO_df, function(x){
+   as.numeric(x > Clust1_threshold)
+  }))
+row.names(imputed_Clust1_df) <- row.names(cluster1_wGO_df)
 
 
-# # Gene enrichment query
-# goResults_1 <- gprofiler(query = genesOfInterest, 
-#                      organism = 'scerevisiae',
-#                      hier_filtering = 'none')
-# 
-# ## Subset and reorder gProfiler results to only include columns of interest
-# gprofiler_results_oe_reordered <- goResults_1[, c("term.id", "domain", "term.name", "p.value", "overlap.size", "term.size", "intersection")]
-# 
-# ## Order the results by p-adjusted value
-# gprofiler_results_oe_reordered <- gprofiler_results_oe_reordered[order(gprofiler_results_oe_reordered$p.value), ]
-# 
-# ## Extract only the 'GO' terms from the results
-# gprofiler_results_oe_GOs <- gprofiler_results_oe_reordered[grep('GO:', gprofiler_results_oe_reordered$term.id), ]
-# 
-# ## Write the enriched GO results to file
-# write.csv(gprofiler_results_oe_GOs, 
-#             "Data/gprofiler_cluster1.csv")
+
+# Subtract input matrix (GO terms for imputed genes from original GO dataframe) from imputed df
+# Comment: matrices have to be the same dimensions for direct comparison so filtering has to be done
+
+# Filter all genes in cluster 1 from the original GO matrix
+cluster1_inputMat <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% rownames(imputed_Clust1_df),]
+rownames(cluster1_inputMat) <- cluster1_inputMat[,1]
+cluster1_inputMat[,1] = c()
+
+# Order by rownames and only include columns in the imputed df
+cluster1_inputMat <- cluster1_inputMat[order(rownames(cluster1_inputMat)),]
+cluster1_inputMat <- cluster1_inputMat[, colnames(cluster1_inputMat) %in% colnames(imputed_Clust1_df)]
+
+# Comment: the dimensions of the resultant df (imputed df) has to be "trimmed down" as well according to the dimensions of the filtered df
+cluster1_filtered_imputed <- imputed_Clust1_df[rownames(imputed_Clust1_df) %in% rownames(cluster1_inputMat),]
+# rownames are ordered the same way as the cluster1_inputMat object for direct comparison
+cluster1_filtered_imputed <- cluster1_[order(rownames(cluster1_)),]
 
 
-# --------Over-representation analysis of biological processes 
+# Comparison between input df and resultant df
+# True or False similarity table
+Clust1_inutVSimputed <- ifelse(cluster1_inputMat==cluster1_filtered_imputed, TRUE, FALSE)
+# 1 or 0 table: 1 (similar) and 0 (dissimilar)
+Clust1_mult <- cluster1_inputMat*cluster1_filtered_imputed
+
+```
+</br>
+
+### 12. Gene Enrichment Analysis 
+```{r echo=TRUE}
+# ---------Functional Enrichment Analysis using using goProfileR
+
+# Gene enrichment query
+goResults_1 <- gprofiler(query = genesOfInterest,
+                     organism = 'scerevisiae',
+                     hier_filtering = 'none')
+
+## Subset and reorder gProfiler results to only include columns of interest
+gprofiler_results_oe_reordered <- goResults_1[, c("term.id", "domain", "term.name", "p.value", "overlap.size", "term.size", "intersection")]
+
+# Order the results by p-adjusted value
+gprofiler_results_oe_reordered <- gprofiler_results_oe_reordered[order(gprofiler_results_oe_reordered$p.value), ]
+ 
+# Extract only the 'GO' terms from the results
+gprofiler_results_oe_GOs <- gprofiler_results_oe_reordered[grep('GO:', gprofiler_results_oe_reordered$term.id), ]
+
+# Write the enriched GO results to file
+write.csv(gprofiler_results_oe_GOs,
+            "Data/gprofiler_cluster1.csv")
+
+
+# --------Over-representation analysis of biological processes
 # perform Gene Set Enrichment Analysis (GSEA) using gage package
 
-# columns(org.Sc.sgd.db)
-# keys(org.Sc.sgd.db)
-# keytypes(org.Sc.sgd.db)
-# 
-# # The input to gage must be Entrez identifiers so we first need to map our gene symbols to Entrez
-# ann <- mapIds(org.Sc.sgd.db, keys=rownames(cluster_1), column="ENTREZID", keytype="ENSEMBL")
-# cluster1_non_na <- names(!is.na(ann))
-# fc <- logcounts[rownames(logcounts) %in% cluster1_non_na,]
-# 
-# table(is.na(fc))
-# 
-# # Create a mapping between gene identifiers and GO terms.
-# allGo <- as.list(GOTERM)
-# bp <- Filter(function(go) go@Ontology == 'BP', allGo)
-# goMapping <- mget(names(bp), org.Sc.sgdGO2ALLORFS, ifnotfound=NA)
-# 
-# # gene set enrichment analysis
-# goFc <- gage(fc, goMapping)
-# goGreater <- as.data.frame(goFc$greater)
-# goGreater <- goGreater[goGreater$q.val < 0.01 & !is.na(goGreater$q.val),]
-# goTermNames <- lapply(mget(rownames(goGreater), GOTERM), function(go) go@Term)
-# goGreater$Term <- goTermNames[rownames(goGreater)]
-# goGreater
+columns(org.Sc.sgd.db)
+keys(org.Sc.sgd.db)
+keytypes(org.Sc.sgd.db)
+
+# The input to gage must be Entrez identifiers so we first need to map our gene symbols to Entrez
+ann <- mapIds(org.Sc.sgd.db, keys=rownames(cluster_1), column="ENTREZID", keytype="ENSEMBL")
+cluster1_non_na <- names(!is.na(ann))
+fc <- logcounts[rownames(logcounts) %in% cluster1_non_na,]
+
+table(is.na(fc))
+
+# Create a mapping between gene identifiers and GO terms.
+allGo <- as.list(GOTERM)
+bp <- Filter(function(go) go@Ontology == 'BP', allGo)
+goMapping <- mget(names(bp), org.Sc.sgdGO2ALLORFS, ifnotfound=NA)
+
+# gene set enrichment analysis
+goFc <- gage(fc, goMapping)
+goGreater <- as.data.frame(goFc$greater)
+goGreater <- goGreater[goGreater$q.val < 0.01 & !is.na(goGreater$q.val),]
+goTermNames <- lapply(mget(rownames(goGreater), GOTERM), function(go) go@Term)
+goGreater$Term <- goTermNames[rownames(goGreater)]
+goGreater
 
 
 
-#---------Imputation using clusterprofiler
-# library("clusterProfiler")
-# 
-# 
-# background_genes <- clusters[clusters$ClusterNumber !=1,]
-# background_geneIDs <- rownames(agg)
-#   
-# yeast_CP_go <- enrichGO(genesOfInterest, "org.Sc.sgd.db", keyType = "ENSEMBL", ont = "ALL", universe = background_geneIDs)
-# yeast_CP_go_df <- as.data.frame(yeast_CP_go)
-# yeast_CP_go_df
+#---------using clusterprofiler
+library("clusterProfiler")
+
+
+background_genes <- clusters[clusters$ClusterNumber !=1,]
+background_geneIDs <- rownames(agg)
+
+yeast_CP_go <- enrichGO(genesOfInterest, "org.Sc.sgd.db", keyType = "ENSEMBL", ont = "ALL", universe = background_geneIDs)
+yeast_CP_go_df <- as.data.frame(yeast_CP_go)
+yeast_CP_go_df
 ```
 
 </br>
 
 
-### 10. Assessing clustering tendency
+### 13. Assessing clustering tendency
 
 ```{r}
 
@@ -526,7 +560,7 @@ dev.off()
 ```
 </br>
 
-### 11. K-means Clustering
+### 14. K-means Clustering
 
 ```{r echo=TRUE}
 # determining the number of clusters (K) using NbClust package
@@ -547,7 +581,7 @@ dev.off()
 ```
 </br>
 
-### 12. Applying Function for K-means results
+### 15. Applying Function for K-means results
 ```{r echo=TRUE}
 
 ```
