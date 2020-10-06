@@ -329,6 +329,7 @@ cluster1_GO_nonzero
 
 # cl (object in wich the herarchical clustering data was saved)
 # cl_mat <- as.matrix(cl)
+
 #cluster_1 <- cl_mat[rownames(cl_mat) %in% cluster1_list,]
 # Comment: this was used initially as data input for the cluster_1 object but I replaced it with the normalised count data (logcounts)
 
@@ -336,8 +337,11 @@ cluster1_GO_nonzero
 # Correlation in Cluster 1
 cluster_1 <- logcounts[rownames(logcounts) %in% cluster1_list,]
 corr_cluster1 <- cor(t(cluster_1))
-hist(corr_cluster1)
-hist(logcounts)
+
+#corr_cluster1 <- as.data.frame(corr_cluster1)
+#corr_cluster1$GeneID <- rownames(corr_cluster1) 
+
+
 
 
 #---function (correlation per cluster) where:
@@ -363,8 +367,7 @@ corr_allClusters <- corr_per_clust(logcounts, clusters, 100)
 # GO terms per cluster
 cluster1_GO_terms <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% genesOfInterest,]
 rownames(cluster1_GO_terms)<- cluster1_GO_terms[,1] 
-cluster1_GO_terms[,1] = NULL
-
+cluster1_GO_terms[,1] <- c()
 cluster1_GO_terms <- cluster1_GO_terms[,which(colSums(cluster1_GO_terms) > 0)]
 
 
@@ -399,12 +402,48 @@ is_blind <- genesOfInterest[genesOfInterest %in% dict_blind$blind]
 blind_gene <- is_blind[1]
 corr_value_blind1 <- corr_cluster1[blind_gene,]
 corr_value_blind1_df <- as.data.frame(corr_value_blind1)
-weighted_go_cluster1 <- merge(corr_value_blind1_df, cluster1_GO_terms)
-weighted_go_cluster1 <- weighted_go_cluster1[,1]*weighted_go_cluster1[,2:ncol(weighted_go_cluster1)]
 
+#crucial part revisit
+weighted_go_cluster1 <- merge(corr_value_blind1_df, cluster1_GO_terms, by = "row.names")
+rownames(weighted_go_cluster1) <- weighted_go_cluster1[,1]
+weighted_go_cluster1[,1] <- c()
+weighted_go_cluster1 <- weighted_go_cluster1[,1]*weighted_go_cluster1[,2:ncol(weighted_go_cluster1)]
 normalized_weighted_go_cluster1 <- colSums(weighted_go_cluster1)/nrow(weighted_go_cluster1) 
 hist(normalized_weighted_go_cluster1)
 
+# Comment: long process by using merge with key column = "GeneID"
+# corr_value_blind1_df$GeneID <- rownames(corr_value_blind1_df)
+# corr_blind1_GO <- corr_value_blind1_df[rownames(corr_value_blind1_df) %in% rownames(cluster1_GO_terms),]
+# cluster1_GO_terms$GeneID <- rownames(cluster1_GO_terms)
+# 
+# corr_blind1_GO_weighted <- merge(corr_blind1_GO, cluster1_GO_terms, by = "GeneID")
+# rownames(corr_blind1_GO_weighted) <- corr_blind1_GO_weighted$GeneID
+# corr_blind1_GO_weighted[,1] <- c()
+# corr_blind1_GO_weighted<- corr_blind1_GO_weighted[,1]*corr_blind1_GO_weighted[,2:ncol(corr_blind1_GO_weighted)]
+# norm_corr_blind1_GO_weighted <- colSums(corr_blind1_GO_weighted)/nrow(corr_blind1_GO_weighted)
+
+#---Function (weighted correlation per gene in a cluster) using modified merge where:
+# gene_list = list of genes to be correlated; corr_cl = correlation values for cluster
+# cl_GO = GO terms for cluster
+
+wcorr2_cluster <- function(gene_list, corr_cl, cl_GO){
+  wcorr_result <- list()
+  
+  for (i in gene_list){
+    corr_value <- corr_cl[i,]
+    corr_value_df <- as.data.frame(corr_value)
+    weighted_go <- merge(corr_value_df, cl_GO, by = "row.names")
+    rownames(weighted_go) <- weighted_go[,1]
+    weighted_go[,1] <- c()
+    weighted_go <- weighted_go[,1]*weighted_go[,2:ncol(weighted_go)]
+    normalized_weighted_go <- colSums(weighted_go)/nrow(weighted_go)
+    wcorr_result[[i]] <- normalized_weighted_go
+  }
+  setNames(wcorr_result, paste0(i))
+  return(wcorr_result)
+}
+
+cluster1_wGO2 <- wcorr2_cluster(is_blind, corr_cluster1, cluster1_GO_terms)
 
 #---function (weighted correlation per gene in a cluster) where:
 # gene_list = list of genes to be correlated; corr_cl = correlation values for cluster
@@ -430,44 +469,66 @@ cluster1_wGO <- wcorr_cluster(is_blind, corr_cluster1, cluster1_GO_terms)
 
 
 # Determining threshold based on histogram
-hist(cluster1_wGO$YDL024C)
+hist(cluster1_wGO$YPR002W)
 imputed_GO_terms <- names(which(normalized_weighted_go_cluster1 > 0.1))
+imputed_GO_terms_new <- names(which(norm_corr_blind1_GO_weighted > 0.1))
+
+# using modified wGO2 function
+hist(cluster1_wGO2$YOR391C)
+
 
 # Convert output into a data frame with columns as GO terms and rows as gene names
 cluster1_wGO_df <- as.data.frame(do.call(rbind, cluster1_wGO))
+# using modified wGO2 function
+cluster1_wGO_df2 <- as.data.frame(do.call(rbind, cluster1_wGO2))
 
 # using 0.1 as threshold
-Clust1_threshold <- 0.1
+Clust1_threshold <- 0.5
 imputed_Clust1_df <- as.data.frame(sapply(cluster1_wGO_df, function(x){
    as.numeric(x > Clust1_threshold)
   }))
 row.names(imputed_Clust1_df) <- row.names(cluster1_wGO_df)
+# using modified wGO2 function
+imputed_Clust1_df2 <- as.data.frame(sapply(cluster1_wGO_df2, function(x){
+   as.numeric(x > Clust1_threshold)
+  }))
+row.names(imputed_Clust1_df2) <- row.names(cluster1_wGO_df2)
 
 
-
-# Subtract input matrix (GO terms for imputed genes from original GO dataframe) from imputed df
+# Subtract input matrix (GO terms for imputed genes from original GO data frame) from imputed df
 # Comment: matrices have to be the same dimensions for direct comparison so filtering has to be done
 
-# Filter all genes in cluster 1 from the original GO matrix
+# Filter original GO matrix to include only the genes from the imputed df
 cluster1_inputMat <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% rownames(imputed_Clust1_df),]
 rownames(cluster1_inputMat) <- cluster1_inputMat[,1]
 cluster1_inputMat[,1] = c()
 
-# Order by rownames and only include columns in the imputed df
-cluster1_inputMat <- cluster1_inputMat[order(rownames(cluster1_inputMat)),]
-cluster1_inputMat <- cluster1_inputMat[, colnames(cluster1_inputMat) %in% colnames(imputed_Clust1_df)]
+# Order by rownames and only include GO terms (columns) from the imputed df
+cluster1_inputMat1 <- cluster1_inputMat[order(rownames(cluster1_inputMat)),]
+cluster1_inputMat1 <- cluster1_inputMat1[, colnames(cluster1_inputMat) %in% colnames(imputed_Clust1_df)]
+# using modified wGO2 function
+cluster1_inputMat2 <- cluster1_inputMat[order(rownames(cluster1_inputMat)),]
+cluster1_inputMat2 <- cluster1_inputMat2[, colnames(cluster1_inputMat) %in% colnames(imputed_Clust1_df2)]
 
-# Comment: the dimensions of the resultant df (imputed df) has to be "trimmed down" as well according to the dimensions of the filtered df
+
+# Comment: the dimensions of the resultant df (imputed df) has to be "trimmed down" as well according to the dimensions of the cluster1_inputMat
 cluster1_filtered_imputed <- imputed_Clust1_df[rownames(imputed_Clust1_df) %in% rownames(cluster1_inputMat),]
 # rownames are ordered the same way as the cluster1_inputMat object for direct comparison
-cluster1_filtered_imputed <- cluster1_[order(rownames(cluster1_)),]
+cluster1_filtered_imputed <- cluster1_filtered_imputed[order(rownames(cluster1_filtered_imputed)),]
 
+# using modified wGO2 function
+cluster1_filtered_imputed2 <- imputed_Clust1_df2[rownames(imputed_Clust1_df2) %in% rownames(cluster1_inputMat2),]
+cluster1_filtered_imputed2 <- cluster1_filtered_imputed2[order(rownames(cluster1_filtered_imputed2)),]
 
 # Comparison between input df and resultant df
 # True or False similarity table
-Clust1_inutVSimputed <- ifelse(cluster1_inputMat==cluster1_filtered_imputed, TRUE, FALSE)
-# 1 or 0 table: 1 (similar) and 0 (dissimilar)
-Clust1_mult <- cluster1_inputMat*cluster1_filtered_imputed
+Clust1_inutVSimputed <- ifelse(cluster1_inputMat1==cluster1_filtered_imputed, TRUE, FALSE)
+
+Clust1_subtract <- cluster1_filtered_imputed - cluster1_inputMat1
+
+Clust1_subtract2 <- cluster1_filtered_imputed2 - cluster1_inputMat2
+
+# Values become negative when threshold is more than 0.5. By inspection, most of the data for genes in Cluster 1 falls between 0 to 0.5
 
 ```
 </br>
@@ -576,7 +637,7 @@ set.seed(123)
 km.res_100 <- kmeans(logcounts, 100, nstart = 25, iter.max = 50)
 
 png("Data/K_means_PASS.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
-fviz_cluster(km.res, data = logcounts, geom="point")
+fviz_cluster(km.res_100, data = logcounts, geom="point")
 dev.off()
 ```
 </br>
