@@ -461,11 +461,11 @@ cluster1_wGO_df <- cluster1_wGO_df[order(rownames(cluster1_wGO_df)),]
 cluster1_wGO_df <- cluster1_wGO_df[,order(colnames(cluster1_wGO_df))]
 
 # using 0.1 as threshold
-Clust1_threshold <- 0.01
-imputed_Clust1_df <- as.data.frame(sapply(cluster1_wGO_df, function(x){
-   as.numeric(x > Clust1_threshold)
-  }))
-row.names(imputed_Clust1_df) <- row.names(cluster1_wGO_df)
+Clust1_threshold <- 0.1
+
+imputed_Clust1_df_v2 <- (as.matrix(cluster1_wGO_df) > Clust1_threshold)*1
+
+
 
 
 # Filter original GO matrix to include only the genes of interest and the GO terms from the imputed df
@@ -481,7 +481,7 @@ cluster1_inputMat1 <- cluster1_inputMat[,order(colnames(cluster1_inputMat))]
 
 
 # Filter imputed_Clust1_df object to include the genes and GO terms of cluster1_inputMat object above
-imputed_Clust1_trim <- imputed_Clust1_df[rownames(imputed_Clust1_df) %in% rownames(cluster1_inputMat),]
+imputed_Clust1_trim <- imputed_Clust1_df[rownames(imputed_Clust1_df_v2) %in% rownames(cluster1_inputMat),]
 # Order by row names for direct comparison
 imputed_Clust1_trim <- imputed_Clust1_trim[order(rownames(imputed_Clust1_trim)),]
 
