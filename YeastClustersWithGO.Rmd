@@ -23,7 +23,7 @@ suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidy
 ```
 </br>
 
-###  1. Download and unzip the Yeast data 
+###  1. Download and unzip the Yeast data (ok)
 ```{r Download Data, echo=TRUE}
 # put in an if statement to check if object exists
 
@@ -43,7 +43,7 @@ head(scerevisiae_data)
 ```
 </br>
 
-### 2. Download, read, and unzip the QC data
+### 2. Download, read, and unzip the QC data (ok)
 ```{r QC Data, echo=TRUE}
 if (!file.exists("Data/scerevisiae_qc.tsv.bz2")){
     download.file("http://dee2.io/mx/scerevisiae_qc.tsv.bz2", 
@@ -55,7 +55,7 @@ head(quality_data)
 ```
 </br>
 
-### 3. Filter and quantify databases according to QC_SUMMARY = PASS.  
+### 3. Filter and quantify databases according to QC_SUMMARY = PASS. (ok)
 ```{r QC Data Summary, echo=TRUE}
 
 # count the total number of QC_SUMMARY entries for checking
@@ -69,7 +69,7 @@ total_pass <- nrow(qc_pass)
 ```
 </br>
 
-### 4. Select all the databses from scerevisiae_se.tsv with QC_SUMMARY == 'PASS' 
+### 4. Select all the databses from scerevisiae_se.tsv with QC_SUMMARY == 'PASS' (ok)
 ```{r Filter yeast bulk data, echo=TRUE}
 
 # filter all the sample names with QC_SUMMARY == 'PASS' from step 3
@@ -94,7 +94,7 @@ scerevisiae_pass_wide[1:10,1:6]
 ```
 </br>
 
-### 5. Aggregate the SRR run data to SRX experiment 
+### 5. Aggregate the SRR run data to SRX experiment (ok)
 ```{r SRR to SRX Aggregation, echo=TRUE}
 
 # Download and read Metadata summary
@@ -159,7 +159,7 @@ dim(agg_f_row)
 ```
 </br>
 
-### 6. Normalisation of Data 
+### 6. Normalisation of Data (ok)
 
 ```{r eval=FALSE, include=FALSE}
 # NORMALISATION FOR LIBRARY SIZE BIAS (cpm)
@@ -243,7 +243,7 @@ dev.off()
 
 
 
-### 9. Gene Ontology and Gene Data 
+### 9. Gene Ontology and Gene Data (ok)
 ```{r}
 # Get the GO Annotation File (GAF) format 2.1 of yeast
 if (!file.exists("Data/scerevisiae_sgd.gaf.gz")){
@@ -258,19 +258,6 @@ head(scerevisiae_GO)
 # Subset unique GeneIDs (V11) and GO IDs (V5) in a dataframe. Select the first gene synonym from column V11 and delete the rest. Use this as the GeneID column. Add another column with 1 in each row indicating the relationship of the Gene ID to the GO ID
 
 scerevisiae_GO_matrix <- data.frame(unique(scerevisiae_GO[,c(11,5)]))
-#----------------TESTING START
-
-
-# gets the common elements of two vectors, a and b
-c <- intersect(b,a)
-# same result as above
-d <- c(unique(a), unique(b))
-e <- d[duplicated(d)]
-# gets the non common elements in two vectors, a and b
-diff.a <- setdiff(a, b)
-
-
-#----------------TESTING END
 scerevisiae_GO_matrix$GeneID <- gsub("\\|.*", "", scerevisiae_GO_matrix$V11)
 scerevisiae_GO_matrix$V3 <- as.numeric(paste(1, scerevisiae_GO_matrix$V3))
 scerevisiae_GO_matrix <- scerevisiae_GO_matrix[,-1]
@@ -427,10 +414,8 @@ cluster1 <- clusters[clusters$ClusterNumber == 1,]
 cluster1_list <- cluster1$GeneID
 
 # look for cluster gene match in GO dictionary and subset nonzero columns 
-cluster1_GO <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% rownames(cluster1),] 
-cluster1_GO_1 <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% rownames(cluster1),]
+cluster1_GO <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% cluster1_list,] 
 cluster1_GO_nonzero <- cluster1_GO[, !apply(cluster1_GO == 0, 2, all)]
-cluster1_GO_nonzero
 
 # Correlation in Cluster 1  (Function counterpart: corr_per_clust)
 cluster_1 <- logcounts[rownames(logcounts) %in% cluster1_list,]
