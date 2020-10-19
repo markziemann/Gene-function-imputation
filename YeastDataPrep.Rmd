@@ -164,6 +164,8 @@ dim(agg)
 # Rows ommited for genes with more than zero counts
 dim(agg_f_row)
 
+# Save agg object
+saveRDS(agg, "agg.rds")
 
 ```
 </br>
