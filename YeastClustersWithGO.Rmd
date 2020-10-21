@@ -209,7 +209,7 @@ all(apply(apply(logcounts, 2, function(x) x==0), 2, any))
 </br>
 
 
-### 8. Heirarchical Clustering with PASS only databases
+### 8. Heirarchical Clustering with PASS only databases (ok)
 ```{r echo=TRUE}
 
 # Applying Hierarchical Clustering after normalization

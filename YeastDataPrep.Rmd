@@ -250,6 +250,12 @@ scerevisiae_GO_matrix_wide[is.na(scerevisiae_GO_matrix_wide)] <- 0
 saveRDS(scerevisiae_GO_matrix_wide, "scerevisiae_GO_matrix_wide.rds")
 head(scerevisiae_GO_matrix_wide)
 
+# GeneIDs that are in the gene count data but not in the GO matrix
+diff_Count.GO <- setdiff(rownames(agg), scerevisiae_GO_matrix_wide$GeneID)
+
+# GeneIDs that are in the GO matrix but not in the  gene count data
+diff_GO.Count <- setdiff(scerevisiae_GO_matrix_wide$GeneID, rownames(agg))
+
 ```
 </br>
 
