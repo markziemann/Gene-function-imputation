@@ -237,8 +237,6 @@ impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
   return(wGO_list)
 }
 
-test5 <- impute(GO_allClusters, corr_allClusters, 3, 0.02)
-
 start.time <- Sys.time()
 wGO_allClusters <- impute(GO_allClusters, corr_allClusters, 100, 0.02)
 end.time <- Sys.time()
@@ -246,6 +244,37 @@ time.taken <- end.time - start.time
 time.taken
 
 
+impute_viz <- function(clust_total, wGO_allCl){
+  
+  wGO_heatmaps <- list()
+  
+  for (i in 1:clust_total){
+    
+    par(cex.main = 0.5)
+    colfunc <- colorRampPalette(c("white", "red"))
+    
+    # create heatmap for input df
+    wGO_heatmaps[[paste0("Cluster", i)]][[paste0("Input")]] <- 
+      heatmap.2(as.matrix(wGO_allCl[[i]][["Input"]]), main=paste0("S.cerevisiae Cluster ",
+                i, " GO Terms"), scale="none", col = colfunc(25), trace="none", margins = 
+                  c(5,5))
+
+    # create heatmap for output df
+     wGO_heatmaps[[paste0("Cluster", i)]][[paste0("Output")]] <- 
+       heatmap.2(as.matrix(wGO_allCl[[i]][["Output"]]), main=paste0("S.cerevisiae 
+                 Cluster ", i, " Imputed GO Terms"), scale="none", col = colfunc(25), 
+                 trace="none", margins = c(5,5))
+
+    # create heatmap for subtraction df
+     wGO_heatmaps[[paste0("Cluster", i)]][[paste0("Diff")]] <- 
+     heatmap.2(as.matrix(wGO_allCl[[i]][["Diff"]]), main=paste0("S.cerevisiae Cluster ", 
+               i, " GO Terms vs Imputed GO Terms"), scale="none", col = colfunc(25), 
+               trace="none", margins = c(5,5))
+  }
+  return(wGO_heatmaps)
+}
+
+wGO_viz <- impute_viz(2, wGO_allClusters)
 
 ```
 </br>
