@@ -22,7 +22,7 @@ suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidy
 ```
 </br>
 
-###  1. Download and unzip the Yeast data 
+### 1. Download and unzip the Yeast data 
 ```{r Download Data, echo=TRUE}
 # put in an if statement to check if object exists
 
@@ -78,6 +78,8 @@ quality_summary <- data.frame(total_pass, total_warn, total_fail, total_summary)
 quality_summary
 
 ```
+</br>
+
 ### 4. Select all the databses from scerevisiae_se.tsv with QC_SUMMARY == 'PASS' 
 ```{r Filter yeast bulk data, echo=TRUE}
 
@@ -171,7 +173,6 @@ saveRDS(agg, "agg.rds")
 </br>
 
 ### 6. Normalisation of Data (with PASS only databases)
-
 ```{r eval=FALSE, include=FALSE}
 # NORMALISATION FOR LIBRARY SIZE BIAS (cpm)
 myCPM <- cpm(agg)
@@ -211,12 +212,67 @@ logcounts_PASS <- cpm(dgeObj,log=TRUE)
 saveRDS(logcounts_PASS, "logcounts_PASS.rds")
 
 # Check distributions of samples
-hist(logcounts)
+hist(logcounts_PASS)
 hist(counts_keep)
 
-all(apply(apply(logcounts, 2, function(x) x==0), 2, any))
+all(apply(apply(logcounts_PASS, 2, function(x) x==0), 2, any))
 
 ```
+</br>
+
+### 7. Heirarchical Clustering with PASS only databases
+```{r echo=TRUE}
+# This chunk can be reused for the PASS + Warn or the WARN filters by changing the content of the filename object. Do not forget to change the name of the variable where you will save the clusters for different inputs. 
+
+# Save the logcounts_PASS.rds object from the data preparation step (YeastDataPrep.Rmd)
+filename <- "logcounts_PASS.rds"
+# Read the logcounts_PASS.rds object and use it in the code
+logcounts <- readRDS(filename)
+
+# Hierarchical Clustering
+cl <-as.dist(1-cor(t(logcounts), method="spearman"))
+hr <- hclust(cl , method="complete")
+
+# optimizing the cluster size
+mycl_PASS <- cutree(hr, h=max(hr$height/1.64))
+# Check the number of clusters. Can be adjusted by changing the h=max denominator
+mycl_length <- length(unique(mycl_PASS))
+
+# Save the clusters value 
+saveRDS(mycl_PASS, "mycl_PASS.rds")
+
+# Prepare Cluster data frame
+clusters <- as.data.frame(mycl)
+colnames(clusters) <- "ClusterNumber"
+
+# make a new column, GeneID, from rownames
+clusters$GeneID <- rownames(clusters)
+
+# Save clusters object as rds
+saveRDS(clusters, "clusters.rds")
+
+
+# Visualizations
+if (!exists("P100")){
+  P100 <- createPalette(100,  c("#ff0000", "#00ff00", "#0000ff"))}
+
+clusterCols <- P100[1:mycl_length]
+myClusterSideBar <- clusterCols[mycl]
+colfunc <- colorRampPalette(c("blue", "white", "red"))
+if (!file.exists("Data/scerevisiae_se.tsv")){
+  write.table(mycl,file="Data/scerevisiae_pass.txt",quote=F,sep="\t")}
+
+# create a 5 x 5 inch png image
+png("Data/yeast_heatmaps_PASS_normalization3.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)          
+
+# create the heatmap
+heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
+          dendrogram="both", scale="column", col = colfunc(25), trace="none", 
+          RowSideColors= myClusterSideBar, margins = c(5,5))
+
+dev.off()
+```
+
 </br>
 
 ### 7. Gene Ontology and Gene Data 
@@ -256,7 +312,71 @@ diff_Count.GO <- setdiff(rownames(agg), scerevisiae_GO_matrix_wide$GeneID)
 # GeneIDs that are in the GO matrix but not in the  gene count data
 diff_GO.Count <- setdiff(scerevisiae_GO_matrix_wide$GeneID, rownames(agg))
 
+# Remove the GeneIDs that are in the GO matrix but not in the gene count data
+IndexRemoved <- which(scerevisiae_GO_matrix_wide$GeneID %in% diff_GO.Count)
+GO_table <- scerevisiae_GO_matrix_wide
+GO_table <- GO_table[-IndexRemoved,]
+# Check if the genes were properly removed 
+diff_GO.Count2 <- setdiff(GO_table$GeneID, rownames(agg))
+dim(diff_GO.Count2)
+
+# Save the new GO table
+saveRDS(GO_table, "GO_table.rds")
 ```
+</br>
+
+### 8. Data preparation functions
+```{r echo=TRUE}
+# This function's output is a nested list with of the genes grouped per cluster and their corresponding correlation values. Inputs:
+# x = logcounts (normalized gene counts from RNA seq)
+# y = clusters (matrix of genes w/ cluster number)
+# clust_total = total number of clusters
+
+corr_per_clust <- function(x, y, clust_total){
+  corr_cl <- list()
+  for (i in 1:clust_total){
+    clusterX <- y[y$ClusterNumber == i,]
+    cluster_list <- as.list(clusterX$GeneID)
+    cluster <- x[rownames(x) %in% cluster_list,]
+    corr_result <- cor(t(cluster))
+    corr_cl[[paste0("Cluster", i)]] <- corr_result
+  }
+  return(corr_cl)
+}
+
+corr_allClusters <- corr_per_clust(logcounts, clusters, 100)
+
+# Save the correlations per cluster
+saveRDS(corr_allClusters, "corr_allClusters.rds")
+
+# This function's output is a list of data frames containing all GO terms associated with the genes belonging to a cluster. Input:
+# x = scerevisiae_GO_matrix_wide (matrix of genes belonging to a GO term)
+# y = clusters (matrix of genes w/ cluster number)
+# clust_total = total number of clusters
+
+GO_per_cl <- function(x,y,clust_total){
+  GO_cl <- list()
+  for (i in 1:clust_total){
+    clusterX <- y[y$ClusterNumber == i,]
+    cluster_list <- as.list(clusterX$GeneID)
+    cluster_GOterms <- x[x$GeneID %in% cluster_list,]
+    rownames(cluster_GOterms)<- cluster_GOterms[,1] 
+    cluster_GOterms[,1] <- c()
+    cluster_GOterms <- cluster_GOterms[,which(colSums(cluster_GOterms) > 0)]
+    GO_cl[[paste0("Cluster", i)]] <- cluster_GOterms
+  }
+  return(GO_cl)
+}
+
+GOterms_allClusters <- GO_per_cl(GO_table, clusters, 100)
+
+# Save the GO terms per cluster
+saveRDS(GOterms_allClusters, "GOterms_allClusters.rds")
+
+
+```
+
+
 </br>
 
 ### Session Information 
