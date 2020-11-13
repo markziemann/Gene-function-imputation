@@ -239,7 +239,12 @@ impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
 
 test5 <- impute(GO_allClusters, corr_allClusters, 3, 0.02)
 
+start.time <- Sys.time()
 wGO_allClusters <- impute(GO_allClusters, corr_allClusters, 100, 0.02)
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+
 
 
 ```
