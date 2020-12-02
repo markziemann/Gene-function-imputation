@@ -16,14 +16,34 @@ output: html_document
 </br>
 
 ### Prerequisite libraries
+
 ```{r Libraries, echo=TRUE}
-suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidyr), library(data.table), library(RColorBrewer), library(gplots), library(Polychrome), library(tidyverse), library(edgeR), library(GO.db), library(gage), library(gProfileR), library(factoextra), library(NbClust), library(org.Sc.sgd.db),library(stringi))})
+
+suppressPackageStartupMessages({
+    library(R.utils)
+    library(dplyr)
+    library(tidyr)
+    library(data.table)
+    library(RColorBrewer)
+    library(gplots)
+    library(Polychrome)
+    library(tidyverse)
+    library(edgeR)
+    library(GO.db)
+    library(gage)
+    library(gProfileR)
+    library(factoextra)
+    library(NbClust)
+    library(org.Sc.sgd.db)
+    library(stringi)
+})
 
 ```
-</br>
 
 ### Load Pre-requisite RDS files 
+
 ```{r echo=TRUE}
+
 file_logcounts_PASS <- "logcounts_PASS.rds"
 file_agg <- "agg.rds"
 file_clusters <- "clusters.rds"
@@ -37,11 +57,11 @@ clusters <- readRDS(file_clusters)
 GO_table <- readRDS(file_GO)
 GO_allClusters <-  readRDS(file_GO_allClusters)
 corr_allClusters <-  readRDS(file_corr_allClusters)
-```
-</br>
 
+```
 
 ### 1. Functions for Cluster Analysis 
+
 ```{r echo=TRUE}
 
 # This function's output is a nested list with of the genes grouped per cluster and their corresponding correlation values. Inputs:
@@ -106,9 +126,9 @@ wcorr_cluster <- function(gene_list, corr_cl, cl_GO){
 }
 
 ```
-</br>
 
 ### 2. Cluster Analysis
+
 ```{r}
 
 # Grouping genes by cluster (using cluster 1)
@@ -169,9 +189,9 @@ Clust1_subtract <- imputed_Clust1_df - input_mat
 which(Clust1_subtract == -1)
 
 ```
-</br>
 
 ### 3. Visualizations
+
 ```{r echo=TRUE, fig.width=8, fig.height=8}
 
 par(cex.main = 0.5)
@@ -179,22 +199,24 @@ par(cex.main = 0.5)
 colfunc <- colorRampPalette(c("white", "red"))
 
 # create heatmap for input matrix
-heatmap.2(as.matrix(input_mat), main="S.cerevisiae Cluster 1 GO Terms", scale="none", col = colfunc(25), trace="none", 
-          margins = c(5,5))
+heatmap.2(as.matrix(input_mat), main="S.cerevisiae Cluster 1 GO Terms", scale="none",
+    col = colfunc(25), trace="none", 
+    margins = c(5,5))
 
 # create heatmap for imputed df
-heatmap.2(as.matrix(imputed_Clust1_df), main="S.cerevisiae Cluster 1 Imputed GO Terms", scale="none", col = colfunc(25), trace="none", 
-          margins = c(5,5))
+heatmap.2(as.matrix(imputed_Clust1_df), main="S.cerevisiae Cluster 1 Imputed GO Terms", 
+    scale="none", col = colfunc(25), trace="none", 
+    margins = c(5,5))
 
 # create heatmap for subtraction matrix
-heatmap.2(as.matrix(Clust1_subtract), main="S.cerevisiae Cluster 1 GO Terms vs Imputed GO Terms", scale="none", col = colfunc(25), trace="none", 
-          margins = c(5,5))
+heatmap.2(as.matrix(Clust1_subtract), main="S.cerevisiae Cluster 1 GO Terms vs Imputed GO Terms", 
+    scale="none", col = colfunc(25), trace="none", 
+    margins = c(5,5))
 
 ```
 
-</br>
-
 ### 4. Imputation function
+
 ```{r echo=TRUE, fig.width=8, fig.height=8}
 
 # This function's output is a nested list of gene clusters containing the data generated for cluster analysis. Input:
@@ -277,9 +299,11 @@ impute_viz <- function(clust_total, wGO_allCl){
 wGO_viz <- impute_viz(2, wGO_allClusters)
 
 ```
-</br>
 
 ### Session Information 
+
 ```{r Session Info, echo=FALSE}
+
 sessionInfo()
+
 ```
