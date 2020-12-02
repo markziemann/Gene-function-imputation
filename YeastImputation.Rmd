@@ -230,29 +230,35 @@ impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
   for (i in 1:clust_total){
     
     GO_list <- rownames(cl_GOall[[i]])
-    corr_cl <- corr_clAll[[i]]
-    gene_list <- rownames(corr_cl)
-    cl_go <- cl_GOall[[i]]
-    
-    wGO_cl <- wcorr_cluster(gene_list, corr_cl, cl_go)
-    wGO_df <- as.data.frame(do.call(rbind, wGO_cl))
-    
-    diff_Cl <- setdiff(gene_list, GO_list)
-    noGOs <- wGO_df[diff_Cl,]*0
+    GO_list <- GO_list[order(GO_list)]
 
-    input_mat <- rbind(cl_go, noGOs)
-    input_mat <- input_mat[order(rownames(input_mat)),]
-    input_mat <- input_mat[,order(colnames(input_mat))]
-    
+    corr_cl <- corr_clAll[[i]]
+    corr_cl <- corr_cl[order(rownames(corr_cl)),]
+    corr_cl <- corr_cl[,order(colnames(corr_cl))]
+    gene_list <- rownames(corr_cl)
+
+    cl_go <- cl_GOall[[i]]
+    # should add gene that are not included in the GO data otherwise merge will yield weird results
+    diff_go_genes <- setdiff(gene_list,rownames(cl_go))
+    add <- data.frame(matrix(0,nrow=length(diff_go_genes),ncol=ncol(cl_go)))
+    rownames(add) <- diff_go_genes
+    colnames(add) <- colnames(cl_go)
+    cl_go <- rbind(cl_go,add)
+    cl_go <- cl_go[order(rownames(cl_go)),]
+    cl_go <- cl_go[,order(colnames(cl_go))]
+
+    wGO_cl <- wcorr_cluster(gene_list=gene_list, corr_cl=corr_cl, cl_GO=cl_go)
+    wGO_df <- as.data.frame(do.call(rbind, wGO_cl))
     wGO_thresh <- (as.matrix(wGO_df) > thresh)*1 
     wGO_thresh <- wGO_thresh[order(rownames(wGO_thresh)),]
     wGO_thresh <- wGO_thresh[,order(colnames(wGO_thresh))]
     
-    cl_subtract <- wGO_thresh - input_mat
+    cl_subtract <- wGO_thresh - cl_go
+    # need to flip some of the values where NAs were replaced with zeros.
+    cl_subtract[cl_subtract<0] <- 1
     
-    wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- input_mat  
-    wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- wGO_df
-    wGO_list[[paste0("Cluster", i)]][[paste0("Thresh")]] <- wGO_thresh
+    wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- cl_go
+    wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- wGO_thresh
     wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- cl_subtract
     
  }
@@ -260,11 +266,14 @@ impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
 }
 
 start.time <- Sys.time()
-wGO_allClusters <- impute(GO_allClusters, corr_allClusters, 100, 0.02)
+
+wGO_allClusters <- impute(cl_GOall = GO_allClusters, 
+     corr_clAll = corr_allClusters,
+     clust_total = 10, thresh = 0.02)
+
 end.time <- Sys.time()
 time.taken <- end.time - start.time
 time.taken
-
 
 impute_viz <- function(clust_total, wGO_allCl){
   
