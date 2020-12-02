@@ -19,6 +19,42 @@ srx_agg <- function(x,counts="GeneCounts") {
 }
 
 
+# This function's output is a list that contains (1) a dataframe with genes 
+# and its corresponding cluster; (2) the number of clusters produced; 
+# and (3) the heirarchical clustering object, hr, that can be used to 
+# change the number of clusters produced by adjusting cut_hmax
+# Input:
+# counts = normalized RNA seq data
+# cut_hmax = used to optimise cluster size; denominator for h=max
+
+cluster <- function(counts, cut_hmax){
+  
+  cluster_data <- list()
+  
+  # Hierarchical Clustering
+  cl <-as.dist(1-cor(t(counts), method="spearman"))
+  hr <- hclust(cl , method="complete")
+  
+  # optimizing the cluster size
+  mycl <- cutree(hr, h=max(hr$height/cut_hmax))
+  # Check the number of clusters. Can be adjusted by changing the h=max denominator
+  mycl_length <- length(unique(mycl))
+  
+  # Prepare Cluster data frame
+  clusters <- as.data.frame(mycl)
+  colnames(clusters) <- "ClusterNumber"
+  
+  # make a new column, GeneID, from rownames
+  clusters$GeneID <- rownames(clusters)
+  
+  cluster_data[["Clusters"]] <- clusters
+  cluster_data[["Cl_length"]] <- mycl_length
+  cluster_data[["hr"]] <- hr
+  
+  return(cluster_data)
+}
+
+
 # This function's output is a nested list with of the genes grouped per 
 # cluster and their corresponding correlation values. 
 # Inputs:
@@ -147,29 +183,35 @@ impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
   for (i in 1:clust_total){
     
     GO_list <- rownames(cl_GOall[[i]])
+    GO_list <- GO_list[order(GO_list)]
+    
     corr_cl <- corr_clAll[[i]]
+    corr_cl <- corr_cl[order(rownames(corr_cl)),]
+    corr_cl <- corr_cl[,order(colnames(corr_cl))]
     gene_list <- rownames(corr_cl)
+    
     cl_go <- cl_GOall[[i]]
+    # should add gene that are not included in the GO data otherwise merge will yield weird results
+    diff_go_genes <- setdiff(gene_list,rownames(cl_go))
+    add <- data.frame(matrix(0,nrow=length(diff_go_genes),ncol=ncol(cl_go)))
+    rownames(add) <- diff_go_genes
+    colnames(add) <- colnames(cl_go)
+    cl_go <- rbind(cl_go,add)
+    cl_go <- cl_go[order(rownames(cl_go)),]
+    cl_go <- cl_go[,order(colnames(cl_go))]
     
-    wGO_cl <- wcorr_cluster(gene_list, corr_cl, cl_go)
+    wGO_cl <- wcorr_cluster(gene_list=gene_list, corr_cl=corr_cl, cl_GO=cl_go)
     wGO_df <- as.data.frame(do.call(rbind, wGO_cl))
-    
-    diff_Cl <- setdiff(gene_list, GO_list)
-    noGOs <- wGO_df[diff_Cl,]*0
-    
-    input_mat <- rbind(cl_go, noGOs)
-    input_mat <- input_mat[order(rownames(input_mat)),]
-    input_mat <- input_mat[,order(colnames(input_mat))]
-    
     wGO_thresh <- (as.matrix(wGO_df) > thresh)*1 
     wGO_thresh <- wGO_thresh[order(rownames(wGO_thresh)),]
     wGO_thresh <- wGO_thresh[,order(colnames(wGO_thresh))]
     
-    cl_subtract <- wGO_thresh - input_mat
+    cl_subtract <- wGO_thresh - cl_go
+    # need to flip some of the values where NAs were replaced with zeros.
+    cl_subtract[cl_subtract<0] <- 1
     
-    wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- input_mat  
-    wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- wGO_df
-    wGO_list[[paste0("Cluster", i)]][[paste0("Thresh")]] <- wGO_thresh
+    wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- cl_go
+    wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- wGO_thresh
     wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- cl_subtract
     
   }

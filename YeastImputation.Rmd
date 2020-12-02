@@ -28,14 +28,6 @@ suppressPackageStartupMessages({
     library(gplots)
     library(Polychrome)
     library(tidyverse)
-    library(edgeR)
-    library(GO.db)
-    library(gage)
-    library(gProfileR)
-    library(factoextra)
-    library(NbClust)
-    library(org.Sc.sgd.db)
-    library(stringi)
 })
 
 ```
@@ -269,11 +261,13 @@ start.time <- Sys.time()
 
 wGO_allClusters <- impute(cl_GOall = GO_allClusters, 
      corr_clAll = corr_allClusters,
-     clust_total = 10, thresh = 0.02)
+     clust_total = 100, thresh = 0.02)
 
 end.time <- Sys.time()
 time.taken <- end.time - start.time
 time.taken
+
+saveRDS(wGO_allClusters, "wGO_allClusters.rds")
 
 impute_viz <- function(clust_total, wGO_allCl){
   

@@ -15,7 +15,19 @@ output: html_document
 
 ### Prerequisite libraries
 ```{r Libraries, echo=TRUE}
-suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidyr), library(data.table), library(RColorBrewer), library(gplots), library(Polychrome), library(tidyverse), library(edgeR), library(GO.db), library(gage), library(gProfileR), library(factoextra), library(NbClust), library(org.Sc.sgd.db),library(stringi))})
+suppressPackageStartupMessages({
+    library(R.utils)
+    library(dplyr)
+    library(tidyr)
+    library(data.table)
+    library(RColorBrewer)
+    library(gplots)
+    library(Polychrome)
+    library(tidyverse)
+    library(caret)
+})
+
+source("functions.R")
 
 ```
 </br>
@@ -24,189 +36,98 @@ suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidy
 ```{r echo=TRUE}
 file_logcounts_PASS <- "logcounts_PASS.rds"
 file_agg <- "agg.rds"
-file_mycl <- "mycl_PASS.rds"
-file_GO <-"scerevisiae_GO_matrix_wide.rds"
+file_clusters <- "clusters.rds"
+file_GO <-"GO_table.rds"
+file_GO_allClusters <- "GOterms_allClusters.rds"
+file_corr_allClusters <- "corr_allClusters.rds"
+file_wGO_allClusters <- "wGO_allClusters.rds"
 
 logcounts <- readRDS(file_logcounts_PASS)
 agg <- readRDS(file_agg)
-mycl <- readRDS(file_mycl)
+clusters <- readRDS(file_clusters)
 GO_table <- readRDS(file_GO)
+GO_allClusters <-  readRDS(file_GO_allClusters)
+corr_allClusters <-  readRDS(file_corr_allClusters)
+wGO_allClusters <- readRDS(file_wGO_allClusters)
 ```
 
 
-### 1. Blinding genes using random strings
+### 1. Blinding known GO terms
+
 ```{r}
 #Fraction of the total number of genes to be blinded
 frac_blind <- 0.10
-number_of_genes <- round(nrow(logcounts)*frac_blind)
+number_of_genes <- round(nrow(GO_table)*frac_blind)
 
-blind <- sample(rownames(logcounts), number_of_genes)
+set.seed(42)
+blind <- sample(GO_table$GeneID, number_of_genes)
 
-rand <- stri_rand_strings(number_of_genes, 15, pattern = "[A-Za-z]")
-rand <- paste("blind_", rand, sep = "")
+rand <- paste("blind_", blind, sep = "")
 dict_blind <- data.frame(blind, rand)
 
-# save the dictionary into an RDS file
-#saveRDS(dict_blind, "dict_blind.rds")
+saveRDS(dict_blind, "dict_blind.rds")
 
 # Make a data matrix with the blinded genes = 0
-logcounts_blinded <- logcounts
-ind_blinded <- which(rownames(logcounts_blinded) %in% blind)
-rownames(logcounts_blinded)[ind_blinded] <- rand
-logcounts_blinded[ind_blinded,] = 0
+GO_blinded <- GO_table
+ind_blinded <- which(GO_table$GeneID %in% blind)
+GO_blinded[ind_blinded, 1] <- rand
+GO_blinded[ind_blinded, 2:ncol(GO_blinded)] = 0
 ```
 </br>
 
-### 2. Functions for Cluster Analysis 
-```{r echo=TRUE}
+### 2. Group Blinded GO terms according to cluster
 
-# This function's output is a nested list with of the genes grouped per cluster and their corresponding correlation values. Inputs:
-# x = logcounts (normalized gene counts from RNA seq)
-# y = clusters (matrix of genes w/ cluster number)
-# clust_total = total number of clusters
+```{r }
 
-corr_per_clust <- function(x, y, clust_total){
-  corr_cl <- list()
-  for (i in 1:clust_total){
-    clusterX <- y[y$ClusterNumber == i,]
-    cluster_list <- as.list(clusterX$GeneID)
-    cluster <- x[rownames(x) %in% cluster_list,]
-    corr_result <- cor(t(cluster))
-    corr_cl[[paste0("Cluster", i)]] <- corr_result
-  }
-  return(corr_cl)
-}
-
-# corr_allClusters <- corr_per_clust(logcounts, clusters, 100)
-
-
-# This function's output is a list of data frames containing all GO terms associated with the genes belonging to a cluster. Input:
-# x = scerevisiae_GO_matrix_wide (matrix of genes belonging to a GO term)
-# y = clusters (matrix of genes w/ cluster number)
-# clust_total = total number of clusters
-
-GO_per_cl <- function(x,y,clust_total){
-  GO_cl <- list()
-  for (i in 1:clust_total){
-    clusterX <- y[y$ClusterNumber == i,]
-    cluster_list <- as.list(clusterX$GeneID)
-    cluster_GOterms <- x[x$GeneID %in% cluster_list,]
-    rownames(cluster_GOterms)<- cluster_GOterms[,1] 
-    cluster_GOterms[,1] <- c()
-    cluster_GOterms <- cluster_GOterms[,which(colSums(cluster_GOterms) > 0)]
-    GO_cl[[paste0("Cluster", i)]] <- cluster_GOterms
-  }
-  return(GO_cl)
-}
-
-#GOterms_allClusters <- GO_per_cl(scerevisiae_GO_matrix_wide, clusters, 100)
-
-
-# This function's output is a nested list of genes belonging to a cluster with their corresponding weighted correlations. Input:
-# gene_list = list of genes to be correlated; corr_cl = correlation values for cluster
-# cl_GO = GO terms for cluster
-
-wcorr_cluster <- function(gene_list, corr_cl, cl_GO){
-  wcorr_result <- list()
-  
-  for (i in gene_list){
-    corr_value <- corr_cl[i,]
-    corr_value_df <- as.data.frame(corr_value)
-    weighted_go <- merge(corr_value_df, cl_GO, by = "row.names")
-    rownames(weighted_go) <- weighted_go[,1]
-    weighted_go[,1] <- c()
-    corr_colsum <- sum(weighted_go[,1])
-    weighted_go <- weighted_go[,1]*weighted_go[,2:ncol(weighted_go)]
-    normalized_weighted_go <- colSums(weighted_go)/corr_colsum
-    wcorr_result[[i]] <- normalized_weighted_go
-  }
-  setNames(wcorr_result, paste0(i))
-  return(wcorr_result)
-}
-
-#cluster1_wGO2 <- wcorr_cluster(is_blind, corr_cluster1, cluster1_GO_terms)
+GO_blindedClusters <- GO_per_cl(GO_blinded, clusters, 100)
 
 ```
 </br>
 
-### 3. Cluster Analysis
-```{r}
-# Prepare Cluster data frame
-clusters <- as.data.frame(mycl)
-colnames(clusters) <- "ClusterNumber"
 
-# make a new column, GeneID, from rownames
-clusters$GeneID <- rownames(clusters)
+### 3. Impute using blinded GO terms 
 
-# Grouping genes by cluster (using cluster 1)
-cluster1 <- clusters[clusters$ClusterNumber == 1,] 
-cluster1_list <- cluster1$GeneID
+```{r }
 
-# look for cluster gene match in GO dictionary and subset nonzero columns 
-cluster1_GO <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% cluster1_list,] 
-cluster1_GO_nonzero <- cluster1_GO[, !apply(cluster1_GO == 0, 2, all)]
+start.time <- Sys.time()
 
-# Correlation in Cluster 1  (Function counterpart: corr_per_clust)
-cluster_1_blinded <- logcounts_blinded[rownames(logcounts_blinded) %in% cluster1_list,]
-corr_cluster1_blinded <- cor(t(cluster_1))
+wGO_blinded <- impute(cl_GOall = GO_blindedClusters, 
+     corr_clAll = corr_allClusters,
+     clust_total = 100, thresh = 0.02)
 
-# GO terms for cluster 1 (Function counterpart: GO_per_cl)
-cluster1_GO_terms <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% cluster1_list,]
-rownames(cluster1_GO_terms)<- cluster1_GO_terms[,1] 
-cluster1_GO_terms[,1] <- c()
-cluster1_GO_terms <- cluster1_GO_terms[,which(colSums(cluster1_GO_terms) > 0)]
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
 
-# weighted correlation for Cluster 1 (Function counterpart: wcorr_cluster)
-# Use function, wcorr_cluster, to get the weighted values for all blinded genes in cluster 1
-cluster1_wGO_blinded <- wcorr_cluster(cluster1_list, cluster_1_blinded, cluster1_GO_terms)
+```
+</br>
 
-# Determining threshold based on histogram
-hist(cluster1_wGO$YPR002W)
+### 4. Build a Confusion Matrix
 
-# Convert output into a data frame with columns as GO terms and rows as gene names
-cluster1_wGO_df_blinded <- as.data.frame(do.call(rbind, cluster1_wGO))
-cluster1_wGO_df_blinded <- cluster1_wGO_df_blinded[order(rownames(cluster1_wGO_df_blinded)),]
-cluster1_wGO_df_blinded <- cluster1_wGO_df_blinded[,order(colnames(cluster1_wGO_df_blinded))]
+```{r }
+# prediction
+cluster1_blind <- wGO_blinded[["Cluster1"]][["Diff"]]
 
-# using 0.1 as threshold
-Clust1_threshold <- 0.1
+# convert to Y and N to factor
+prediction <- mutate_if(cluster1_blind, is.numeric, as.factor) 
+rownames(prediction) <- rownames(cluster1_blind)
 
-imputed_GO_terms_blinded <- names(which(cluster1_wGO_df_blinded > Clust1_threshold))
+# reference
+cluster1 <- wGO_allClusters[["Cluster1"]][["Input"]]
 
-imputed_Clust1_df_blibded <- (as.matrix(cluster1_wGO_df_blinded) > Clust1_threshold)*1
+# convert to Y and N to factor
+reference <- mutate_if(cluster1, is.numeric, as.factor) 
+rownames(reference) <- rownames(cluster1)
 
 
-
-# Filter original GO matrix to include only the genes of interest and the GO terms from the imputed df
-# Filter by row
-cluster1_inputMat <- scerevisiae_GO_matrix_wide[scerevisiae_GO_matrix_wide$GeneID %in% rownames(imputed_Clust1_df),]
-rownames(cluster1_inputMat) <- cluster1_inputMat[,1]
-cluster1_inputMat[,1] = c()
-# Filter by column
-cluster1_inputMat <- cluster1_inputMat[,colnames(cluster1_inputMat) %in% colnames(imputed_Clust1_df)]
-# Order by row names and column names
-cluster1_inputMat1 <- cluster1_inputMat[order(rownames(cluster1_inputMat)),]
-cluster1_inputMat1 <- cluster1_inputMat[,order(colnames(cluster1_inputMat))]
-
-
-# Filter imputed_Clust1_df object to include the genes and GO terms of cluster1_inputMat object above
-imputed_Clust1_trim <- imputed_Clust1_df[rownames(imputed_Clust1_df_v2) %in% rownames(cluster1_inputMat),]
-# Order by row names for direct comparison
-imputed_Clust1_trim <- imputed_Clust1_trim[order(rownames(imputed_Clust1_trim)),]
-
-
-# Comparison between input df and resultant df
-Clust1_inutVSimputed <- ifelse(cluster1_inputMat == imputed_Clust1_trim, TRUE, FALSE)
-
-# Negative 1 values appear for threshold > 0.005
-Clust1_subtract <- imputed_Clust1_trim - cluster1_inputMat
-which(Clust1_subtract == -1)
+conf_matrix.cl1 <- confusionMatrix(prediction[,1], reference[,1])
 
 ```
 </br>
 
 
 ### Session Information 
+
 ```{r Session Info, echo=FALSE}
 sessionInfo()
 ```
