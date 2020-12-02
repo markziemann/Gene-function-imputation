@@ -42,7 +42,7 @@ suppressPackageStartupMessages({
 
 ### Load Pre-requisite RDS files 
 
-```{r echo=TRUE}
+```{r , loadrds}
 
 file_logcounts_PASS <- "logcounts_PASS.rds"
 file_agg <- "agg.rds"
@@ -62,7 +62,7 @@ corr_allClusters <-  readRDS(file_corr_allClusters)
 
 ### 1. Functions for Cluster Analysis 
 
-```{r echo=TRUE}
+```{r , functions, echo=TRUE}
 
 # This function's output is a nested list with of the genes grouped per cluster and their corresponding correlation values. Inputs:
 # x = logcounts (normalized gene counts from RNA seq)
@@ -129,7 +129,7 @@ wcorr_cluster <- function(gene_list, corr_cl, cl_GO){
 
 ### 2. Cluster Analysis
 
-```{r}
+```{r, clustering}
 
 # Grouping genes by cluster (using cluster 1)
 cluster1 <- clusters[clusters$ClusterNumber == 1,] 
@@ -157,7 +157,7 @@ diff_Cluster1.GO <- setdiff(cluster1_list, cluster1_GOList)
 cluster1_wGO <- wcorr_cluster(cluster1_list, corr_cluster1, cluster1_GO_terms)
 
 # Determining threshold based on histogram
-hist(cluster1_wGO$YPR002W)
+hist(cluster1_wGO[[1]])
 
 # Convert output into a data frame with columns as GO terms and rows as gene names
 cluster1_wGO_df <- as.data.frame(do.call(rbind, cluster1_wGO))
