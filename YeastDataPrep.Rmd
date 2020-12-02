@@ -1,36 +1,48 @@
 ---
 title: "Yeast Data Preparation: Filtering, Aggregation, and Normalisation"
 author: "M.Soria"
-date: "18/10/2020"
-output: html_document
+date: "`r Sys.Date()`"
+output:
+  html_document:
+  toc: true
+theme: cosmo
 ---
 
-</br>
+### Introduction
 
-***
-
-##### The following code consists of the data preparation steps for the RNA-Seq data for Saccharomyces cerevisiae. The data preparation consists of quality filtering, aggregation, and normalisation.
-
-***
-
-</br>
-
+The following code consists of the data preparation steps for the RNA-Seq data for Saccharomyces cerevisiae. 
+The data preparation consists of quality filtering, aggregation, and normalisation.
 
 ### Prerequisite libraries
+
 ```{r Libraries, echo=TRUE}
-suppressPackageStartupMessages({c(library(R.utils), library(dplyr), library(tidyr), library(data.table), library(RColorBrewer), library(Polychrome), library(gplots), library(edgeR))})
+
+suppressPackageStartupMessages({
+    library(R.utils)
+    library(dplyr)
+    library(tidyr)
+    library(data.table)
+    library(RColorBrewer)
+    library(Polychrome)
+    library(gplots)
+    library(edgeR)
+})
+
 ```
-</br>
 
 ### 1. Download and unzip the Yeast data 
+
 ```{r Download Data, echo=TRUE}
+
 # put in an if statement to check if object exists
 
 if (!file.exists("Data/scerevisiae_se.tsv.bz2")){
     download.file("http://dee2.io/mx/scerevisiae_se.tsv.bz2", 
               destfile = "Data/scerevisiae_se.tsv.bz2")}
 
-# fread error msg: This file is very unusual: it ends abruptly without a final newline, and also its size is a multiple of 4096 bytes. Please properly end the last row with a newline using for example 'echo >> file' to avoid this  time to copy. 
+# fread error msg: This file is very unusual: it ends abruptly without a final newline, 
+# and also its size is a multiple of 4096 bytes.
+# Please properly end the last row with a newline using for example 'echo >> file' to avoid this time to copy. 
 
 # needed to go back to bunzip2
 if (!file.exists("Data/scerevisiae_se.tsv")){
@@ -39,22 +51,26 @@ if (!file.exists("Data/scerevisiae_se.tsv")){
 scerevisiae_data <- fread("Data/scerevisiae_se.tsv", sep = '\t', header = FALSE)
 
 head(scerevisiae_data)
+
 ```
-</br>
 
 ### 2. Download, read, and unzip the QC data
+
 ```{r QC Data, echo=TRUE}
+
 if (!file.exists("Data/scerevisiae_qc.tsv.bz2")){
     download.file("http://dee2.io/mx/scerevisiae_qc.tsv.bz2", 
               destfile = "Data/scerevisiae_qc.tsv.bz2")}
 
-quality_data <- fread("Data/scerevisiae_qc.tsv.bz2", sep = '\t', col.names = c("Database", "Description", "Details"))
+quality_data <- fread("Data/scerevisiae_qc.tsv.bz2", sep = '\t', 
+  col.names = c("Database", "Description", "Details"))
 
 head(quality_data)
+
 ```
-</br>
 
 ### 3. Filter and quantify databases according to QC_SUMMARY = PASS, WARN, or FAIL.  
+
 ```{r QC Data Summary, echo=TRUE}
 
 # count the total number of QC_SUMMARY entries for checking
@@ -78,9 +94,9 @@ quality_summary <- data.frame(total_pass, total_warn, total_fail, total_summary)
 quality_summary
 
 ```
-</br>
 
 ### 4. Select all the databses from scerevisiae_se.tsv with QC_SUMMARY == 'PASS' 
+
 ```{r Filter yeast bulk data, echo=TRUE}
 
 # filter all the sample names with QC_SUMMARY == 'PASS' from step 3
@@ -103,9 +119,9 @@ scerevisiae_pass_wide <- scerevisiae_pass_wide[,-1]
 scerevisiae_pass_wide[1:10,1:6]
 
 ```
-</br>
 
 ### 5. Aggregate the SRR run data to SRX experiment (with PASS only databases)
+
 ```{r SRR to SRX Aggregation, echo=TRUE}
 
 # Download and read Metadata summary
@@ -170,10 +186,11 @@ dim(agg_f_row)
 saveRDS(agg, "agg.rds")
 
 ```
-</br>
 
 ### 6. Normalisation of Data (with PASS only databases)
-```{r eval=FALSE, include=FALSE}
+
+```{r }
+
 # NORMALISATION FOR LIBRARY SIZE BIAS (cpm)
 myCPM <- cpm(agg)
 # add a small number to the entire dataframe to account for zero reads
@@ -191,13 +208,16 @@ counts_keep <- myCPM[keep,]
 summary(keep)
 dim(counts_keep)
 
-# A CPM of 0.6 is used as it corresponds to a count of 10-15 for the library sizes in this data set. If the count is any smaller, it is considered to be very low, indicating that the associated gene is not expressed in that sample. As a general rule, a good threshold can be chosen by identifying the CPM that corresponds to a count of 10, which in this case is about 0.6. You should filter with CPMs rather than filtering on the counts directly, as the latter does not account for differences in library sizes between samples.
-
+# A CPM of 0.6 is used as it corresponds to a count of 10-15 for the library sizes in this data set.
+# If the count is any smaller, it is considered to be very low, indicating that the associated gene is not expressed in that sample.
+# As a general rule, a good threshold can be chosen by identifying the CPM that corresponds to a count of 10, which in this case is about 0.6.
+# You should filter with CPMs rather than filtering on the counts directly, as the latter does not account for differences in library sizes between samples.
 # Note: When in doubt, a threshold of 1 CPM in at least minimum group sample size is a good rule of thumb.
 
 # Check whether our threshold of 0.6 does indeed correspond to a count of about 10-15
 # Add a vertical line at 0.6 CPM, and a horizontal line at Counts = 10
-plot(myCPM[,1], agg[,1], ylim=c(0,50), xlim=c(0,3), abline(v=0.6, h=10, col="blue"), ylab = "Counts", xlab = "CPM", main = "Counts-per-million (CPM) vs Counts")
+plot(myCPM[,1], agg[,1], ylim=c(0,50), xlim=c(0,3), abline(v=0.6, h=10, col="blue"), 
+  ylab = "Counts", xlab = "CPM", main = "Counts-per-million (CPM) vs Counts")
 
 # Convert counts to DGEList object (from edgeR library)
 dgeObj <- DGEList(counts_keep)
@@ -218,11 +238,13 @@ hist(counts_keep)
 all(apply(apply(logcounts_PASS, 2, function(x) x==0), 2, any))
 
 ```
-</br>
 
 ### 7. Heirarchical Clustering with PASS only databases
-```{r echo=TRUE}
-# This chunk can be reused for the PASS + Warn or the WARN filters by changing the content of the filename object. Do not forget to change the name of the variable where you will save the clusters for different inputs. 
+
+```{r echo=TRUE,fig.height=8,fig.width=8}
+
+# This chunk can be reused for the PASS + Warn or the WARN filters by changing the content of the filename object. 
+# Do not forget to change the name of the variable where you will save the clusters for different inputs. 
 
 # Save the logcounts_PASS.rds object from the data preparation step (YeastDataPrep.Rmd)
 filename <- "logcounts_PASS.rds"
@@ -234,12 +256,12 @@ cl <-as.dist(1-cor(t(logcounts), method="spearman"))
 hr <- hclust(cl , method="complete")
 
 # optimizing the cluster size
-mycl_PASS <- cutree(hr, h=max(hr$height/1.64))
+mycl <- cutree(hr, h=max(hr$height/1.64))
 # Check the number of clusters. Can be adjusted by changing the h=max denominator
-mycl_length <- length(unique(mycl_PASS))
+mycl_length <- length(unique(mycl))
 
 # Save the clusters value 
-saveRDS(mycl_PASS, "mycl_PASS.rds")
+saveRDS(mycl, "mycl_PASS.rds")
 
 # Prepare Cluster data frame
 clusters <- as.data.frame(mycl)
@@ -251,7 +273,6 @@ clusters$GeneID <- rownames(clusters)
 # Save clusters object as rds
 saveRDS(clusters, "clusters.rds")
 
-
 # Visualizations
 if (!exists("P100")){
   P100 <- createPalette(100,  c("#ff0000", "#00ff00", "#0000ff"))}
@@ -259,7 +280,7 @@ if (!exists("P100")){
 clusterCols <- P100[1:mycl_length]
 myClusterSideBar <- clusterCols[mycl]
 colfunc <- colorRampPalette(c("blue", "white", "red"))
-if (!file.exists("Data/scerevisiae_se.tsv")){
+if (!file.exists("Data/scerevisiae_pass.txt")){
   write.table(mycl,file="Data/scerevisiae_pass.txt",quote=F,sep="\t")}
 
 # create a 5 x 5 inch png image
@@ -271,12 +292,19 @@ heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
           RowSideColors= myClusterSideBar, margins = c(5,5))
 
 dev.off()
+
+# create the heatmap
+heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
+          dendrogram="both", scale="column", col = colfunc(25), trace="none",
+          RowSideColors= myClusterSideBar, margins = c(5,5))
+
 ```
 
-</br>
 
 ### 7. Gene Ontology and Gene Data 
+
 ```{r}
+
 # Get the GO Annotation File (GAF) format 2.1 of yeast
 if (!file.exists("Data/scerevisiae_sgd.gaf.gz")){
     download.file("http://current.geneontology.org/annotations/sgd.gaf.gz", 
@@ -287,7 +315,10 @@ if (!file.exists("Data/scerevisiae_sgd.gaf")){
 scerevisiae_GO <- fread("Data/scerevisiae_sgd.gaf", sep = '\t', header = FALSE)
 head(scerevisiae_GO)
 
-# Subset unique GeneIDs (V11) and GO IDs (V5) in a dataframe. Select the first gene synonym from column V11 and delete the rest. Use this as the GeneID column. Add another column with 1 in each row indicating the relationship of the Gene ID to the GO ID
+# Subset unique GeneIDs (V11) and GO IDs (V5) in a dataframe. 
+# Select the first gene synonym from column V11 and delete the rest. 
+# Use this as the GeneID column. 
+# Add another column with 1 in each row indicating the relationship of the Gene ID to the GO ID
 
 scerevisiae_GO_matrix <- data.frame(unique(scerevisiae_GO[,c(11,5)]))
 scerevisiae_GO_matrix$GeneID <- gsub("\\|.*", "", scerevisiae_GO_matrix$V11)
@@ -322,11 +353,14 @@ dim(diff_GO.Count2)
 
 # Save the new GO table
 saveRDS(GO_table, "GO_table.rds")
+
 ```
-</br>
+
 
 ### 8. Data preparation functions
+
 ```{r echo=TRUE}
+
 # This function's output is a nested list with of the genes grouped per cluster and their corresponding correlation values. Inputs:
 # x = logcounts (normalized gene counts from RNA seq)
 # y = clusters (matrix of genes w/ cluster number)
@@ -373,13 +407,13 @@ GOterms_allClusters <- GO_per_cl(GO_table, clusters, 100)
 # Save the GO terms per cluster
 saveRDS(GOterms_allClusters, "GOterms_allClusters.rds")
 
-
 ```
 
 
-</br>
-
 ### Session Information 
+
 ```{r Session Info, echo=FALSE}
+
 sessionInfo()
+
 ```
