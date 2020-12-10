@@ -51,27 +51,28 @@ corr_allClusters <-  readRDS(file_corr_allClusters)
 wGO_allClusters <- readRDS(file_wGO_allClusters)
 ```
 
-
 ### 1. Blinding known GO terms
 
 ```{r}
 #Fraction of the total number of genes to be blinded
-frac_blind <- 0.10
-number_of_genes <- round(nrow(GO_table)*frac_blind)
+nfolds <- 10
 
 set.seed(42)
-blind <- sample(GO_table$GeneID, number_of_genes)
+folds <- sample(1:nfolds, nrow(GO_table), replace = TRUE)
+#fix rownames
+dict_folds <- data.frame(GO_table$GeneID, folds)
 
-rand <- paste("blind_", blind, sep = "")
-dict_blind <- data.frame(blind, rand)
+saveRDS(dict_blind, "dict_folds.rds")
 
-saveRDS(dict_blind, "dict_blind.rds")
 
 # Make a data matrix with the blinded genes = 0
+which_fold <- 1
+
+ind_blinded <- which(dict_folds$folds == which_fold)
 GO_blinded <- GO_table
-ind_blinded <- which(GO_table$GeneID %in% blind)
-GO_blinded[ind_blinded, 1] <- rand
+
 GO_blinded[ind_blinded, 2:ncol(GO_blinded)] = 0
+
 ```
 </br>
 
@@ -79,7 +80,14 @@ GO_blinded[ind_blinded, 2:ncol(GO_blinded)] = 0
 
 ```{r }
 
-GO_blindedClusters <- GO_per_cl(GO_blinded, clusters, 100)
+# Get the list of GO terms per cluster from the original db (before blinding) to use as a reference for filtering the relevant GO terms per cluster. This also makes sure that dimensions (number of columns) in all of the trials are equal.
+
+GOterms_perCl <- GO_list_perCl(wGO_allClusters, 100)
+
+
+# Get the GO terms by cluster using the blinded data and the GO list per cluster
+
+GO_blindedClusters <- GO_per_cl_blinded(GO_blinded,clusters, GOterms_perCl, 100)
 
 ```
 </br>
@@ -102,28 +110,23 @@ time.taken
 ```
 </br>
 
-### 4. Build a Confusion Matrix
+### 4. Measures of performance per cluster
 
-```{r }
-# prediction
-cluster1_blind <- wGO_blinded[["Cluster1"]][["Diff"]]
+```{r}
 
-# convert to Y and N to factor
-prediction <- mutate_if(cluster1_blind, is.numeric, as.factor) 
-rownames(prediction) <- rownames(cluster1_blind)
+stats_perCl <- stats_cl(wGO_allClusters, wGO_blinded, 100)
 
-# reference
-cluster1 <- wGO_allClusters[["Cluster1"]][["Input"]]
-
-# convert to Y and N to factor
-reference <- mutate_if(cluster1, is.numeric, as.factor) 
-rownames(reference) <- rownames(cluster1)
-
-
-conf_matrix.cl1 <- confusionMatrix(prediction[,1], reference[,1])
-
+stats_perCl[["Cluster1"]]
 ```
-</br>
+
+### 5. Measures of performance for the entire data frame
+
+```{r}
+
+stats_final <- stats_all(stats_perCl)
+
+stats_final
+```
 
 
 ### Session Information 

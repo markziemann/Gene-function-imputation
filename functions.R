@@ -90,7 +90,8 @@ GO_per_cl <- function(x,y,clust_total){
     cluster_GOterms <- x[x$GeneID %in% cluster_list,]
     rownames(cluster_GOterms)<- cluster_GOterms[,1] 
     cluster_GOterms[,1] <- c()
-    cluster_GOterms <- cluster_GOterms[,which(colSums(cluster_GOterms) > 0)]
+    # will trim down GO Terms during blinding
+    # cluster_GOterms <- cluster_GOterms[,which(colSums(cluster_GOterms) > 0)]
     GO_cl[[paste0("Cluster", i)]] <- cluster_GOterms
   }
   return(GO_cl)
@@ -134,6 +135,50 @@ GO_per_cl <- function(x,y,clust_total){
     rownames(cluster_GOterms)<- cluster_GOterms[,1] 
     cluster_GOterms[,1] <- c()
     cluster_GOterms <- cluster_GOterms[,which(colSums(cluster_GOterms) > 0)]
+    GO_cl[[paste0("Cluster", i)]] <- cluster_GOterms
+  }
+  return(GO_cl)
+}
+
+
+# This function's output is a nested list of GO terms (column names) grouped 
+# per cluster from the original input data frame before blinding
+# Input:
+# x = list object containing the input data frame before blinding
+# clust_total = total number of clusters
+
+GO_list_perCl <- function(x,clust_total){
+  GO_names <- list()
+  
+  for (i in 1:clust_total){
+    input <- x[[i]][["Input"]]
+    GO_list <- colnames(input)
+    
+    GO_names[[paste0("Cluster", i)]] <- GO_list
+  }
+  return(GO_names)
+}
+
+
+# This function's output is a list of data frames containing all 
+# GO terms (from the blinded db) associated with the genes belonging 
+# to a cluster. 
+# Input:
+# x = scerevisiae_GO_matrix_wide (matrix of genes belonging to a GO term)
+# y = clusters (matrix of genes w/ cluster number)
+# GO_list_perCl = a nested list object containing the GO terms (column names)
+# of the original db (before blinding) in each cluster
+# clust_total = total number of clusters
+
+GO_per_cl_blinded <- function(x,y,GO_list_perCl,clust_total){
+  GO_cl <- list()
+  for (i in 1:clust_total){
+    clusterX <- y[y$ClusterNumber == i,]
+    cluster_list <- as.list(clusterX$GeneID)
+    cluster_GOterms <- x[x$GeneID %in% cluster_list,]
+    rownames(cluster_GOterms)<- cluster_GOterms[,1] 
+    cluster_GOterms[,1] <- c()
+    cluster_GOterms <- cluster_GOterms[, colnames(cluster_GOterms) %in% GO_list_perCl[[i]] ]
     GO_cl[[paste0("Cluster", i)]] <- cluster_GOterms
   }
   return(GO_cl)
@@ -191,7 +236,8 @@ impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
     gene_list <- rownames(corr_cl)
     
     cl_go <- cl_GOall[[i]]
-    # should add gene that are not included in the GO data otherwise merge will yield weird results
+    # should add gene that are not included in the GO data otherwise merge 
+    # will yield weird results
     diff_go_genes <- setdiff(gene_list,rownames(cl_go))
     add <- data.frame(matrix(0,nrow=length(diff_go_genes),ncol=ncol(cl_go)))
     rownames(add) <- diff_go_genes
@@ -255,5 +301,112 @@ impute_viz <- function(clust_total, wGO_allCl){
                 trace="none", margins = c(5,5))
   }
   return(wGO_heatmaps)
+}
+
+
+# This function's output is a nested list of vectors that measures the 
+# performance of the imputation using the blinded and original data frames
+# grouped per cluster.
+# Inputs:
+# input_df = data frame, the original GO annotation binary matrix
+# blinded_df = data frame, the imputed binary matrix using blinded data
+# clust_total = total number of clusters
+
+stats_cl <- function(input_df, blinded_df, clust_total){
+  stats_list <- list()
+  
+  for (i in 1:clust_total){
+    input <- input_df[[i]][["Input"]]
+    blind <- blinded_df[[i]][["Diff"]]
+    
+    diff <- input - blind 
+    sum <- input + blind
+    
+    TP <- length(which(sum == 2)) #True positive
+    TN <- length(which(sum == 0)) #True negative
+    FP <- length(which(diff == -1)) #False positive
+    FN <- length(which(diff == 1)) #False negative
+    
+    # False negative rate (FNR)
+    FNR <- FN/(FN+TP)
+    # Sensitivity/True Positive Rate (TPR)
+    TPR <- 1 - FNR
+    # False Positive Rate (FPR)
+    FPR <- FP/(FP+TN)
+    # Specificity/True Negative Rate (TNR)
+    TNR <- 1 - FPR
+    # Precision/Positive Predictive Value (PPV)
+    PPV <- TP/(TP+FP)
+    # accuracy (ACC)
+    ACC <- (TP+TN)/(TP+TN+FP+FN)
+    # F1 score (is the harmonic mean of precision and sensitivity)
+    F1 <- (2*TP)/((2*TP)+FP+FN)
+    
+    stats_list[[paste0("Cluster", i)]][[paste0("TP")]] <- TP
+    stats_list[[paste0("Cluster", i)]][[paste0("TN")]] <- TN
+    stats_list[[paste0("Cluster", i)]][[paste0("FP")]] <- FP
+    stats_list[[paste0("Cluster", i)]][[paste0("FN")]] <- FN
+    
+    stats_list[[paste0("Cluster", i)]][[paste0("Sensitivity (TPR)")]] <- TPR
+    stats_list[[paste0("Cluster", i)]][[paste0("Specificity (TNR)")]] <- TNR
+    stats_list[[paste0("Cluster", i)]][[paste0("Precision (PPV)")]] <- PPV
+    stats_list[[paste0("Cluster", i)]][[paste0("Accuracy (ACC)")]] <- ACC
+    stats_list[[paste0("Cluster", i)]][[paste0("F1 score")]] <- F1
+  }
+  return(stats_list)
+}
+
+
+# This function's output is a list of vectors that measures the 
+# performance of the whole imputation using the blinded 
+# and original data frames.
+# Input:
+# stats_cl = list, statistical measures of performance per cluster
+
+stats_all <- function(stats_cl){
+  
+  stats_total <- list()
+  
+  # Transform nester list, stats_perCl, to data frame
+  stats_df <- do.call(rbind.data.frame, lapply(stats_cl, 
+                                               as.data.frame, stringsAsFactors = FALSE))
+  
+  TP <- sum(stats_perCl_df$TP) #True positive
+  TN <- sum(stats_perCl_df$TN) #True negative
+  FP <- sum(stats_perCl_df$FP) #False positive
+  FN <- sum(stats_perCl_df$FN) #False negative
+  
+  # False negative rate (FNR)
+  FNR <- FN/(FN+TP)
+  # Sensitivity/True Positive Rate (TPR)
+  TPR <- 1 - FNR
+  # False Positive Rate (FPR)
+  FPR <- FP/(FP+TN)
+  # Specificity/True Negative Rate (TNR)
+  TNR <- 1 - FPR
+  # Precision/Positive Predictive Value (PPV)
+  PPV <- TP/(TP+FP)
+  # Negative Predictive Value (NPV)
+  NPV <- TN/(TN+FN)
+  # accuracy (ACC)
+  ACC <- (TP+TN)/(TP+TN+FP+FN)
+  # balanced accuracy (BA)
+  BA <- (TPR+TNR)/2
+  # F1 score (is the harmonic mean of precision and sensitivity)
+  F1 <- (2*TP)/((2*TP)+FP+FN)
+  
+  
+  stats_total[["TP_all"]] <- TP
+  stats_total[["TN_all"]] <- TN
+  stats_total[["FP_all"]] <- FP
+  stats_total[["FN_all"]] <- FN
+  
+  stats_total[["Sensitivity"]] <- TPR
+  stats_total[["Specificity"]] <- TNR
+  stats_total[["Precision"]] <- PPV
+  stats_total[["Accuracy"]] <- ACC
+  stats_total[["F1 Score"]] <- F1
+  
+  return(stats_total)
 }
 
