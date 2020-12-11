@@ -41,6 +41,7 @@ file_GO <-"GO_table.rds"
 file_GO_allClusters <- "GOterms_allClusters.rds"
 file_corr_allClusters <- "corr_allClusters.rds"
 file_wGO_allClusters <- "wGO_allClusters.rds"
+file_GOterms_perCl <- "GOterms_perCl.rds"
 
 logcounts <- readRDS(file_logcounts_PASS)
 agg <- readRDS(file_agg)
@@ -49,6 +50,7 @@ GO_table <- readRDS(file_GO)
 GO_allClusters <-  readRDS(file_GO_allClusters)
 corr_allClusters <-  readRDS(file_corr_allClusters)
 wGO_allClusters <- readRDS(file_wGO_allClusters)
+GOterms_perCl <- readRDS(file_GOterms_perCl)
 ```
 
 ### 1. Blinding known GO terms
@@ -80,14 +82,7 @@ GO_blinded[ind_blinded, 2:ncol(GO_blinded)] = 0
 
 ```{r }
 
-# Get the list of GO terms per cluster from the original db (before blinding) to use as a reference for filtering the relevant GO terms per cluster. This also makes sure that dimensions (number of columns) in all of the trials are equal.
 
-GOterms_perCl <- GO_list_perCl(wGO_allClusters, 100)
-
-
-# Get the GO terms by cluster using the blinded data and the GO list per cluster
-
-GO_blindedClusters <- GO_per_cl_blinded(GO_blinded,clusters, GOterms_perCl, 100)
 
 ```
 </br>
@@ -97,35 +92,43 @@ GO_blindedClusters <- GO_per_cl_blinded(GO_blinded,clusters, GOterms_perCl, 100)
 
 ```{r }
 
-start.time <- Sys.time()
+# Get the GO terms by cluster using the blinded data and the GO list per cluster
+
+GO_blindedClusters <- GO_per_cl_blinded(GO_blinded, clusters, GOterms_perCl, 100)
+
 
 wGO_blinded <- impute(cl_GOall = GO_blindedClusters, 
      corr_clAll = corr_allClusters,
      clust_total = 100, thresh = 0.02)
 
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
 
 ```
 </br>
 
-### 4. Measures of performance per cluster
+### 4. Measures of performance 
 
 ```{r}
+
+# per cluster
 
 stats_perCl <- stats_cl(wGO_allClusters, wGO_blinded, 100)
 
-stats_perCl[["Cluster1"]]
-```
+stats_perCl[["Cluster50"]]
 
-### 5. Measures of performance for the entire data frame
 
-```{r}
+#for the entire data frame
 
 stats_final <- stats_all(stats_perCl)
 
 stats_final
+
+```
+
+### 5. ROC and AUC 
+
+```{r}
+
+
 ```
 
 

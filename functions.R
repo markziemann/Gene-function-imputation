@@ -90,8 +90,7 @@ GO_per_cl <- function(x,y,clust_total){
     cluster_GOterms <- x[x$GeneID %in% cluster_list,]
     rownames(cluster_GOterms)<- cluster_GOterms[,1] 
     cluster_GOterms[,1] <- c()
-    # will trim down GO Terms during blinding
-    # cluster_GOterms <- cluster_GOterms[,which(colSums(cluster_GOterms) > 0)]
+    cluster_GOterms <- cluster_GOterms[,which(colSums(cluster_GOterms) > 0)]
     GO_cl[[paste0("Cluster", i)]] <- cluster_GOterms
   }
   return(GO_cl)
@@ -367,9 +366,9 @@ stats_all <- function(stats_cl){
   
   stats_total <- list()
   
-  # Transform nester list, stats_perCl, to data frame
+  # Transform nested list to data frame
   stats_df <- do.call(rbind.data.frame, lapply(stats_cl, 
-                                               as.data.frame, stringsAsFactors = FALSE))
+              as.data.frame, stringsAsFactors = FALSE))
   
   TP <- sum(stats_perCl_df$TP) #True positive
   TN <- sum(stats_perCl_df$TN) #True negative
@@ -395,6 +394,8 @@ stats_all <- function(stats_cl){
   # F1 score (is the harmonic mean of precision and sensitivity)
   F1 <- (2*TP)/((2*TP)+FP+FN)
   
+  
+  stats_total[["Stats_df"]] <- stats_df
   
   stats_total[["TP_all"]] <- TP
   stats_total[["TN_all"]] <- TN

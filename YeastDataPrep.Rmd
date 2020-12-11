@@ -361,50 +361,19 @@ saveRDS(GO_table, "GO_table.rds")
 
 ```{r echo=TRUE}
 
-# This function's output is a nested list with of the genes grouped per cluster and their corresponding correlation values. Inputs:
-# x = logcounts (normalized gene counts from RNA seq)
-# y = clusters (matrix of genes w/ cluster number)
-# clust_total = total number of clusters
-
-corr_per_clust <- function(x, y, clust_total){
-  corr_cl <- list()
-  for (i in 1:clust_total){
-    clusterX <- y[y$ClusterNumber == i,]
-    cluster_list <- as.list(clusterX$GeneID)
-    cluster <- x[rownames(x) %in% cluster_list,]
-    corr_result <- cor(t(cluster))
-    corr_cl[[paste0("Cluster", i)]] <- corr_result
-  }
-  return(corr_cl)
-}
-
+# A nested list with of the genes grouped per cluster and their 
+# corresponding correlation values. 
 corr_allClusters <- corr_per_clust(logcounts, clusters, 100)
 
 # Save the correlations per cluster
 saveRDS(corr_allClusters, "corr_allClusters.rds")
 
-# This function's output is a list of data frames containing all GO terms associated with the genes belonging to a cluster. Input:
-# x = scerevisiae_GO_matrix_wide (matrix of genes belonging to a GO term)
-# y = clusters (matrix of genes w/ cluster number)
-# clust_total = total number of clusters
 
-GO_per_cl <- function(x,y,clust_total){
-  GO_cl <- list()
-  for (i in 1:clust_total){
-    clusterX <- y[y$ClusterNumber == i,]
-    cluster_list <- as.list(clusterX$GeneID)
-    cluster_GOterms <- x[x$GeneID %in% cluster_list,]
-    rownames(cluster_GOterms)<- cluster_GOterms[,1] 
-    cluster_GOterms[,1] <- c()
-    cluster_GOterms <- cluster_GOterms[,which(colSums(cluster_GOterms) > 0)]
-    GO_cl[[paste0("Cluster", i)]] <- cluster_GOterms
-  }
-  return(GO_cl)
-}
+# A list of data frames containing all GO terms associated with the genes belonging to a cluster.
 
 GOterms_allClusters <- GO_per_cl(GO_table, clusters, 100)
 
-# Save the GO terms per cluster
+# Save the GO terms grouped per cluster
 saveRDS(GOterms_allClusters, "GOterms_allClusters.rds")
 
 ```
