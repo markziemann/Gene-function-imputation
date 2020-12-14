@@ -78,16 +78,16 @@ corr_per_clust <- function(x, y, clust_total){
 # This function's output is a list of data frames containing all GO 
 # terms associated with the genes belonging to a cluster. 
 # Input:
-# x = scerevisiae_GO_matrix_wide (matrix of genes belonging to a GO term)
+# GO_annot = scerevisiae_GO_matrix_wide (matrix of genes belonging to a GO term)
 # y = clusters (matrix of genes w/ cluster number)
 # clust_total = total number of clusters
 
-GO_per_cl <- function(x,y,clust_total){
+GO_per_cl <- function(GO_annot, clusters, clust_total){
   GO_cl <- list()
   for (i in 1:clust_total){
-    clusterX <- y[y$ClusterNumber == i,]
+    clusterX <- clusters[clusters$ClusterNumber == i,]
     cluster_list <- as.list(clusterX$GeneID)
-    cluster_GOterms <- x[x$GeneID %in% cluster_list,]
+    cluster_GOterms <- GO_annot[GO_annot$GeneID %in% cluster_list,]
     rownames(cluster_GOterms)<- cluster_GOterms[,1] 
     cluster_GOterms[,1] <- c()
     cluster_GOterms <- cluster_GOterms[,which(colSums(cluster_GOterms) > 0)]
@@ -163,10 +163,10 @@ GO_list_perCl <- function(x,clust_total){
 # GO terms (from the blinded db) associated with the genes belonging 
 # to a cluster. 
 # Input:
-# x = scerevisiae_GO_matrix_wide (matrix of genes belonging to a GO term)
+# x = Annotation matrix after blinding
 # y = clusters (matrix of genes w/ cluster number)
 # GO_list_perCl = a nested list object containing the GO terms (column names)
-# of the original db (before blinding) in each cluster
+#               of the original db (before blinding) in each cluster
 # clust_total = total number of clusters
 
 GO_per_cl_blinded <- function(x,y,GO_list_perCl,clust_total){
@@ -218,8 +218,10 @@ wcorr_cluster <- function(gene_list, corr_cl, cl_GO){
 # containing the data generated for cluster analysis. 
 # Input:
 # cl_GOall = GO terms per cluster
+# corr_clAll = correlation values grouped by cluster
 # corr_cl = correlations per cluster
 # clust_total = total number of clusters
+# thresh = threshold value from 0 to 1
 
 impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
   wGO_list <- list()
@@ -303,6 +305,8 @@ impute_viz <- function(clust_total, wGO_allCl){
 }
 
 
+### ------------- Measures of performance 
+
 # This function's output is a nested list of vectors that measures the 
 # performance of the imputation using the blinded and original data frames
 # grouped per cluster.
@@ -367,13 +371,13 @@ stats_all <- function(stats_cl){
   stats_total <- list()
   
   # Transform nested list to data frame
-  stats_df <- do.call(rbind.data.frame, lapply(stats_cl, 
-              as.data.frame, stringsAsFactors = FALSE))
+  stats_df <- as.data.frame(t(as.data.frame(
+              lapply(stats_cl, unlist))))
   
-  TP <- sum(stats_perCl_df$TP) #True positive
-  TN <- sum(stats_perCl_df$TN) #True negative
-  FP <- sum(stats_perCl_df$FP) #False positive
-  FN <- sum(stats_perCl_df$FN) #False negative
+  TP <- sum(stats_df$TP) #True positive
+  TN <- sum(stats_df$TN) #True negative
+  FP <- sum(stats_df$FP) #False positive
+  FN <- sum(stats_df$FN) #False negative
   
   # False negative rate (FNR)
   FNR <- FN/(FN+TP)
@@ -411,3 +415,60 @@ stats_all <- function(stats_cl){
   return(stats_total)
 }
 
+
+# This function's output is a list of the measures of 
+# performance from the stats_all function applied to a k-fold 
+# cross validation process
+# Input
+# n = number of folds
+# GO_annot = original GO annotation matrix
+# clusters = matrix of genes w/ cluster number
+# GO_list_perCl = a nested list object containing the GO 
+#               terms (column names) of the original db
+#               (before blinding) in each cluster
+# corr_clAll = correlation values grouped by cluster
+# wGO_allClusters = A nested list of gene clusters containing 
+#               the data generated from cluster analysis using
+#               the impute function
+# clust_total = total number of clusters
+# thresh = threshold value from 0 to 1
+
+cross_val <- function(n, GO_annot, clusters,
+                      GO_list_perCl, corr_clAll,
+                      wGO_allClusters, clust_total, 
+                      thresh){
+  
+  stats <- list()
+  
+  # partition the data
+  nfolds <- n
+  set.seed(42)
+  folds <- sample(1:nfolds, nrow(GO_annot), replace = TRUE)
+  
+  dict_folds <- data.frame(GO_annot$GeneID, folds)
+  saveRDS(dict_blind, "dict_folds.rds")
+  
+  for (i in 1:n){
+    which_fold <- i
+    
+    ind_blinded <- which(dict_folds$folds == which_fold)
+    GO_blinded <- GO_annot
+    GO_blinded[ind_blinded, 2:ncol(GO_blinded)] = 0
+    
+    # Get the GO terms by cluster using the blinded data 
+    # and the GO list per cluster
+    GO_blindedCl <- GO_per_cl_blinded(GO_blinded, clusters, 
+                                      GO_list_perCl, clust_total)
+    
+    # Impute function
+    wGO_blinded <- impute(GO_blindedCl, corr_clAll,
+                          clust_total, thresh)
+    
+    # stats
+    stats_perCl <- stats_cl(wGO_allClusters, wGO_blinded, clust_total)
+    stats_final <- stats_all(stats_perCl)
+    
+    stats[[paste0("Fold", i)]] <- stats_final
+  }
+  return(stats)
+}

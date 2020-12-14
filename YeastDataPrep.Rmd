@@ -28,6 +28,8 @@ suppressPackageStartupMessages({
     library(edgeR)
 })
 
+source("functions.R")
+
 ```
 
 ### 1. Download and unzip the Yeast data 

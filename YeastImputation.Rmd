@@ -146,56 +146,7 @@ heatmap.2(as.matrix(Clust1_subtract), main="S.cerevisiae Cluster 1 GO Terms vs I
 
 ```{r echo=TRUE, fig.width=8, fig.height=8}
 
-# This function's output is a nested list of gene clusters containing the data generated for cluster analysis. Input:
-# cl_GOall = GO terms per cluster
-# corr_cl = correlations per cluster
-# clust_total = total number of clusters
-
-impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
-  wGO_list <- list()
-  
-  for (i in 1:clust_total){
-    
-    # gene IDs with GOs in cluster i
-    GO_list <- rownames(cl_GOall[[i]])
-    GO_list <- GO_list[order(GO_list)]
-
-    # correlation df for cluster i
-    corr_cl <- corr_clAll[[i]]
-    corr_cl <- corr_cl[order(rownames(corr_cl)),]
-    corr_cl <- corr_cl[,order(colnames(corr_cl))]
-    # gene IDs from the correlation table for cluster i
-    gene_list <- rownames(corr_cl)
-
-    # GO binary matrix for cluster i
-    cl_go <- cl_GOall[[i]]
-    # should add gene that are not included in the GO data otherwise merge 
-    # will yield weird results
-    diff_go_genes <- setdiff(gene_list,rownames(cl_go))
-    add <- data.frame(matrix(0,nrow=length(diff_go_genes),ncol=ncol(cl_go)))
-    rownames(add) <- diff_go_genes
-    colnames(add) <- colnames(cl_go)
-    cl_go <- rbind(cl_go,add)
-    cl_go <- cl_go[order(rownames(cl_go)),]
-    cl_go <- cl_go[,order(colnames(cl_go))]
-
-    wGO_cl <- wcorr_cluster(gene_list=gene_list, corr_cl=corr_cl, cl_GO=cl_go)
-    wGO_df <- as.data.frame(do.call(rbind, wGO_cl))
-    wGO_thresh <- (as.matrix(wGO_df) > thresh)*1 
-    wGO_thresh <- wGO_thresh[order(rownames(wGO_thresh)),]
-    wGO_thresh <- wGO_thresh[,order(colnames(wGO_thresh))]
-    
-    cl_subtract <- wGO_thresh - cl_go
-    # need to flip some of the values where NAs were replaced with zeros.
-    cl_subtract[cl_subtract<0] <- 1
-    
-    wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- cl_go
-    wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- wGO_thresh
-    wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- cl_subtract
-    
- }
-  return(wGO_list)
-}
+# A nested list of gene clusters containing the data generated for cluster analysis. 
 
 start.time <- Sys.time()
 
@@ -209,38 +160,17 @@ time.taken
 
 saveRDS(wGO_allClusters, "wGO_allClusters.rds")
 
-impute_viz <- function(clust_total, wGO_allCl){
-  
-  wGO_heatmaps <- list()
-  
-  for (i in 1:clust_total){
-    
-    par(cex.main = 0.5)
-    colfunc <- colorRampPalette(c("white", "red"))
-    
-    # create heatmap for input df
-    wGO_heatmaps[[paste0("Cluster", i)]][[paste0("Input")]] <- 
-      heatmap.2(as.matrix(wGO_allCl[[i]][["Input"]]), main=paste0("S.cerevisiae Cluster ",
-                i, " GO Terms"), scale="none", col = colfunc(25), trace="none", margins = 
-                  c(5,5))
 
-    # create heatmap for output df
-     wGO_heatmaps[[paste0("Cluster", i)]][[paste0("Output")]] <- 
-       heatmap.2(as.matrix(wGO_allCl[[i]][["Output"]]), main=paste0("S.cerevisiae 
-                 Cluster ", i, " Imputed GO Terms"), scale="none", col = colfunc(25), 
-                 trace="none", margins = c(5,5))
-
-    # create heatmap for subtraction df
-     wGO_heatmaps[[paste0("Cluster", i)]][[paste0("Diff")]] <- 
-     heatmap.2(as.matrix(wGO_allCl[[i]][["Diff"]]), main=paste0("S.cerevisiae Cluster ", 
-               i, " GO Terms vs Imputed GO Terms"), scale="none", col = colfunc(25), 
-               trace="none", margins = c(5,5))
-  }
-  return(wGO_heatmaps)
-}
-
+# Vizualizations 
 wGO_viz <- impute_viz(2, wGO_allClusters)
 
+
+# Get the list of GO terms per cluster from the original db (before blinding) to use as a reference for filtering the relevant GO terms per cluster. This also makes sure that dimensions (number of columns) in all of the trials are equal.
+
+GOterms_perCl <- GO_list_perCl(wGO_allClusters, 100)
+
+# Save the list of GO terms per cluster
+saveRDS(GOterms_perCl, "GOterms_perCl.rds")
 ```
 
 ### Session Information 

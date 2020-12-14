@@ -68,7 +68,7 @@ saveRDS(dict_blind, "dict_folds.rds")
 
 
 # Make a data matrix with the blinded genes = 0
-which_fold <- 1
+which_fold <- 3
 
 ind_blinded <- which(dict_folds$folds == which_fold)
 GO_blinded <- GO_table
@@ -76,31 +76,20 @@ GO_blinded <- GO_table
 GO_blinded[ind_blinded, 2:ncol(GO_blinded)] = 0
 
 ```
-</br>
-
-### 2. Group Blinded GO terms according to cluster
-
-```{r }
-
-
-
-```
-</br>
-
 
 ### 3. Impute using blinded GO terms 
 
 ```{r }
 
-# Get the GO terms by cluster using the blinded data and the GO list per cluster
+# Get the GO terms by cluster using the blinded data 
+# and the GO list per cluster
 
-GO_blindedClusters <- GO_per_cl_blinded(GO_blinded, clusters, GOterms_perCl, 100)
-
+GO_blindedClusters <- GO_per_cl_blinded(GO_blinded, 
+                        clusters, GOterms_perCl, 100)
 
 wGO_blinded <- impute(cl_GOall = GO_blindedClusters, 
      corr_clAll = corr_allClusters,
      clust_total = 100, thresh = 0.02)
-
 
 ```
 </br>
@@ -111,20 +100,65 @@ wGO_blinded <- impute(cl_GOall = GO_blindedClusters,
 
 # per cluster
 
-stats_perCl <- stats_cl(wGO_allClusters, wGO_blinded, 100)
+stats_perCl3 <- stats_cl(wGO_allClusters, wGO_blinded, 100)
 
-stats_perCl[["Cluster50"]]
+stats_perCl3[["Cluster50"]]
 
 
 #for the entire data frame
 
-stats_final <- stats_all(stats_perCl)
+stats_final7 <- stats_all(stats_perCl7)
 
-stats_final
+stats_final3
+
+# does not work for other R server (R version 3.6.3 (2020-02-29)
+# Platform: x86_64-pc-linux-gnu (64-bit))
+# stats_df2 <- do.call(rbind.data.frame, stats_perCl)
+
+# works for both servers
+stats_df3 <- as.data.frame(t(as.data.frame(lapply(stats_perCl, unlist))))
+
+sum(stats_df$TP)
 
 ```
 
-### 5. ROC and AUC 
+### 5. K-Fold with Stats
+
+```{r}
+
+start.time <- Sys.time()
+
+kfold <- cross_val(n=10, GO_annot=GO_table, clusters=clusters,
+                      GO_list_perCl=GOterms_perCl, 
+                      corr_clAll=corr_allClusters,
+                      wGO_allClusters=wGO_allClusters,
+                      clust_total=100, thresh=0.02)
+
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken # 1.801095 hours
+
+kfold_50 <- cross_val(n=10, GO_annot=GO_table, clusters=clusters,
+                      GO_list_perCl=GOterms_perCl, 
+                      corr_clAll=corr_allClusters,
+                      wGO_allClusters=wGO_allClusters,
+                      clust_total=100, thresh=0.5)
+
+kfold_90 <- cross_val(n=10, GO_annot=GO_table, clusters=clusters,
+                      GO_list_perCl=GOterms_perCl, 
+                      corr_clAll=corr_allClusters,
+                      wGO_allClusters=wGO_allClusters,
+                      clust_total=100, thresh=0.9)
+
+kfold_df <- as.data.frame(do.call(rbind, kfold))
+
+kfold_90_df <- as.data.frame(do.call(rbind, kfold_90))
+
+kfold_50_df <- as.data.frame(do.call(rbind, kfold_50))
+
+```
+
+### 6. ROC and AUC 
 
 ```{r}
 
