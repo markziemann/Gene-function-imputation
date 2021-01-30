@@ -256,12 +256,13 @@ logcounts <- readRDS(filename)
 # Hierarchical Clustering
 cl <-as.dist(1-cor(t(logcounts), method="spearman"))
 hr <- hclust(cl , method="complete")
+saveRDS(hr, "hr_PASS.rds")
 
 # optimizing the cluster size
-mycl <- cutree(hr, h=max(hr$height/1.64))
+mycl <- cutree(hr, h=max(hr$height/1.324))
 # Check the number of clusters. Can be adjusted by changing the h=max denominator
 mycl_length <- length(unique(mycl))
-
+mycl_length
 # Save the clusters value 
 saveRDS(mycl, "mycl_PASS.rds")
 
@@ -275,30 +276,34 @@ clusters$GeneID <- rownames(clusters)
 # Save clusters object as rds
 saveRDS(clusters, "clusters.rds")
 
-# Visualizations
-if (!exists("P100")){
-  P100 <- createPalette(100,  c("#ff0000", "#00ff00", "#0000ff"))}
+# Create a list of data frames for genes with different total clusters
+cluster_cuts <- cl_lengthCut(hr=hr, min=1.324, max=3.38, interval=0.05)
+saveRDS(cluster_cuts, "cluster_cuts.rds")
 
-clusterCols <- P100[1:mycl_length]
-myClusterSideBar <- clusterCols[mycl]
-colfunc <- colorRampPalette(c("blue", "white", "red"))
-if (!file.exists("Data/scerevisiae_pass.txt")){
-  write.table(mycl,file="Data/scerevisiae_pass.txt",quote=F,sep="\t")}
-
-# create a 5 x 5 inch png image
-png("Data/yeast_heatmaps_PASS_normalization3.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)          
-
-# create the heatmap
-heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
-          dendrogram="both", scale="column", col = colfunc(25), trace="none", 
-          RowSideColors= myClusterSideBar, margins = c(5,5))
-
-dev.off()
-
-# create the heatmap
-heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
-          dendrogram="both", scale="column", col = colfunc(25), trace="none",
-          RowSideColors= myClusterSideBar, margins = c(5,5))
+# # Visualizations
+# if (!exists("P100")){
+#   P100 <- createPalette(100,  c("#ff0000", "#00ff00", "#0000ff"))}
+# 
+# clusterCols <- P100[1:mycl_length]
+# myClusterSideBar <- clusterCols[mycl]
+# colfunc <- colorRampPalette(c("blue", "white", "red"))
+# if (!file.exists("Data/scerevisiae_pass.txt")){
+#   write.table(mycl,file="Data/scerevisiae_pass.txt",quote=F,sep="\t")}
+# 
+# # create a 5 x 5 inch png image
+# png("Data/yeast_heatmaps_PASS_normalization3.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)          
+# 
+# # create the heatmap
+# heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
+#           dendrogram="both", scale="column", col = colfunc(25), trace="none", 
+#           RowSideColors= myClusterSideBar, margins = c(5,5))
+# 
+# dev.off()
+# 
+# # create the heatmap
+# heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
+#           dendrogram="both", scale="column", col = colfunc(25), trace="none",
+#           RowSideColors= myClusterSideBar, margins = c(5,5))
 
 ```
 

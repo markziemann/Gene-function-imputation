@@ -118,6 +118,41 @@ corr_per_clust <- function(x, y, clust_total){
   return(corr_cl)
 }
 
+
+# This function's output is a list of data frames clustered genes 
+# with different total clusters. 
+# Input:
+# hr = heirarchical clustering object
+# min and max = minimum and maximum value of the denominator used
+#               in the cutree function to determine total clusters
+# interval = intervals for the vector of values between min and max
+#               used as input for different cluster totals
+
+cl_lengthCut <- function(hr, min, max, interval){
+  
+  mycl_cuts <- list()
+  
+  cut <- seq(from = min, to = max, by = interval)
+  
+  for (i in cut){
+    # optimizing the cluster size
+    mycl <- cutree(hr, h=max(hr$height/i))
+    # Check the number of clusters. Can be adjusted by changing the h=max denominator
+    mycl_length <- length(unique(mycl))
+    
+    # Prepare Cluster data frame
+    clusters <- as.data.frame(mycl)
+    colnames(clusters) <- "ClusterNumber"
+    
+    # make a new column, GeneID, from rownames
+    clusters$GeneID <- rownames(clusters)
+    
+    mycl_cuts[[paste0("Cluster", mycl_length)]] <- clusters
+  }
+  return(mycl_cuts)
+}
+
+
 # This function's output is a list of data frames containing all 
 # GO terms associated with the genes belonging to a cluster. 
 # Input:
@@ -354,7 +389,7 @@ stats_cl <- function(input_df, blinded_df, clust_total){
     stats_list[[paste0("Cluster", i)]][[paste0("Specificity (TNR)")]] <- TNR
     stats_list[[paste0("Cluster", i)]][[paste0("Precision (PPV)")]] <- PPV
     stats_list[[paste0("Cluster", i)]][[paste0("Accuracy (ACC)")]] <- ACC
-    stats_list[[paste0("Cluster", i)]][[paste0("F1 score")]] <- F1
+    stats_list[[paste0("Cluster", i)]][[paste0("F1_Score")]] <- F1
   }
   return(stats_list)
 }
@@ -410,7 +445,7 @@ stats_all <- function(stats_cl){
   stats_total[["Specificity"]] <- TNR
   stats_total[["Precision"]] <- PPV
   stats_total[["Accuracy"]] <- ACC
-  stats_total[["F1 Score"]] <- F1
+  stats_total[["F1_Score"]] <- F1
   
   return(stats_total)
 }
@@ -471,4 +506,42 @@ cross_val <- function(n, GO_annot, clusters,
     stats[[paste0("Fold", i)]] <- stats_final
   }
   return(stats)
+}
+
+
+### ------------- Optimisation 
+
+# This function's output is a list of values to use
+# as the denominator for hmax in the cutree function 
+# to get a desired number of the total clusters
+# Inputs:
+# hr = object from the hclust function
+# cut_min = hmax denominator value for cl_min (can start with 0)
+# cl_min, cl_max = min and max of total clusters
+# interval = intervals beween min and max total clusters
+
+mycl_opt <- function(hr, cut_min, 
+                     cl_min, cl_max, interval){
+  
+  mycl_cuts <- list()
+  cl_total <- seq(from = cl_min, to = cl_max, by = interval)
+  
+  # optimizing the cluster size
+  for (i in cl_total){
+    
+    cut = cut_min
+    mycl_length = 0
+    while (mycl_length!=i) {
+      #mycl <- cutree(hr, h=max(hr$height/cut))
+      # Check the number of clusters
+      mycl_length <- length(unique(cutree(hr, h=max(hr$height/cut))))
+      
+      if (mycl_length==i){
+        mycl_cuts[[paste0(i)]] <- cut
+        print(paste(i, cut))
+      } #else cut = round((cut + 0.00001), digits = 4)
+      else cut = cut + 0.0001           
+    }
+  }
+  return(mycl_cuts)
 }

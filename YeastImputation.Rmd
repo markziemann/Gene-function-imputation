@@ -44,6 +44,7 @@ file_clusters <- "clusters.rds"
 file_GO <-"GO_table.rds"
 file_GO_allClusters <- "GOterms_allClusters.rds"
 file_corr_allClusters <- "corr_allClusters.rds"
+file_cuttree_totals <- "cuttree_totals.rds"
 
 logcounts <- readRDS(file_logcounts_PASS)
 agg <- readRDS(file_agg)
@@ -51,6 +52,7 @@ clusters <- readRDS(file_clusters)
 GO_table <- readRDS(file_GO)
 GO_allClusters <-  readRDS(file_GO_allClusters)
 corr_allClusters <-  readRDS(file_corr_allClusters)
+cuttree_totals <- readRDS(file_cuttree_totals)
 
 ```
 
@@ -172,6 +174,51 @@ GOterms_perCl <- GO_list_perCl(wGO_allClusters, 100)
 # Save the list of GO terms per cluster
 saveRDS(GOterms_perCl, "GOterms_perCl.rds")
 ```
+
+### 5. Optimization of parameters
+
+```{r}
+
+library("svMisc")
+myclClusters_df <- function(hr, cutree_values){
+    
+    mycl_df <- list()
+    
+    for (i in 1:991){ 
+        
+        div <- cutree_values[[i]]
+        mycl <- cutree(hr, h=max(hr$height/div))
+        clusters <- as.data.frame(mycl)
+        colnames(clusters) <- "ClusterNumber"
+        
+        a <- as.numeric(names(cutree_values[i]))
+        tally <- list()
+        for (j in 1:a) {
+           
+           tot <- length(which(clusters$ClusterNumber == j))
+           tally[[j]] <- tot
+        }
+        
+        tallyDF <- t(as.data.frame(tally))
+        rownames(tallyDF) <- c(1:a)
+        
+        mycl_df[[names(cutree_values[i])]][["ClusterNum"]] <- clusters
+        mycl_df[[names(cutree_values[i])]][["Tally"]] <- tallyDF
+            
+            
+        progress(i)
+        Sys.sleep(0.01)
+                       
+    }
+   return(mycl_df)
+}
+
+
+clTotals_dfs <- myclClusters_df(hr=hr, cutree_values=cuttree_totals)
+saveRDS(clTotals_dfs, "clTotals_dfs.rds")
+
+```
+
 
 ### Session Information 
 

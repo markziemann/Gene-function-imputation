@@ -42,6 +42,7 @@ file_GO_allClusters <- "GOterms_allClusters.rds"
 file_corr_allClusters <- "corr_allClusters.rds"
 file_wGO_allClusters <- "wGO_allClusters.rds"
 file_GOterms_perCl <- "GOterms_perCl.rds"
+file_cluster_cuts <- "cluster_cuts.rds"
 
 logcounts <- readRDS(file_logcounts_PASS)
 agg <- readRDS(file_agg)
@@ -51,6 +52,7 @@ GO_allClusters <-  readRDS(file_GO_allClusters)
 corr_allClusters <-  readRDS(file_corr_allClusters)
 wGO_allClusters <- readRDS(file_wGO_allClusters)
 GOterms_perCl <- readRDS(file_GOterms_perCl)
+cluster_cuts <- file_cluster_cuts
 ```
 
 ### 1. Blinding known GO terms
@@ -87,6 +89,11 @@ GO_blinded[ind_blinded, 2:ncol(GO_blinded)] = 0
 GO_blindedClusters <- GO_per_cl_blinded(GO_blinded, 
                         clusters, GOterms_perCl, 100)
 
+GO_blindedClCuts <- function(){
+    
+}
+
+
 wGO_blinded <- impute(cl_GOall = GO_blindedClusters, 
      corr_clAll = corr_allClusters,
      clust_total = 100, thresh = 0.02)
@@ -122,7 +129,7 @@ sum(stats_df$TP)
 
 ```
 
-### 5. K-Fold with Stats
+### 5. K-Fold with Global perfomance metrics (per threshold)
 
 ```{r}
 
@@ -151,11 +158,62 @@ kfold_90 <- cross_val(n=10, GO_annot=GO_table, clusters=clusters,
                       clust_total=100, thresh=0.9)
 
 kfold_df <- as.data.frame(do.call(rbind, kfold))
-
 kfold_90_df <- as.data.frame(do.call(rbind, kfold_90))
-
 kfold_50_df <- as.data.frame(do.call(rbind, kfold_50))
 
+kfold_50_ave <- mean(unlist(kfold_50_df$Precision))
+
+
+
+cross_val_thresh <- function(interval){
+    
+    kfold_gobal <- list()
+    
+    thresh <- seq(from = 0.5, to = 1, by = interval)
+    
+    for (i in thresh){
+        
+        kfold <- cross_val(n=10, GO_annot=GO_table, clusters=clusters,
+                      GO_list_perCl=GOterms_perCl, 
+                      corr_clAll=corr_allClusters,
+                      wGO_allClusters=wGO_allClusters,
+                      clust_total=100, thresh= i)
+        
+        kfold_df <- as.data.frame(do.call(rbind, kfold))
+        
+        Sensitivity <- mean(unlist(kfold_df$Sensitivity))
+        Specificity <- mean(unlist(kfold_df$Specificity))
+        Precision <- mean(unlist(kfold_df$Precision))
+        Accuracy <- mean(unlist(kfold_df$Accuracy))
+        F1_Score <- mean(unlist(kfold_df$`F1 Score`))
+        
+        
+        kfold_gobal[[paste0(i)]][["DF"]] <- kfold_df
+        kfold_gobal[[paste0(i)]][["Sensitivity"]] <- Sensitivity
+        kfold_gobal[[paste0(i)]][["Specificity"]] <- Specificity
+        kfold_gobal[[paste0(i)]][["Precision"]] <- Precision
+        kfold_gobal[[paste0(i)]][["Accuracy"]] <- Accuracy
+        kfold_gobal[[paste0(i)]][["F1_Score"]] <- F1_Score
+    }
+    return(kfold_gobal)
+}
+
+
+start.time <- Sys.time()
+
+kfold_mult <- cross_val_thresh(0.4)
+
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken # 5.564071 hours
+
+start.time <- Sys.time()
+
+kfold_mult2 <- cross_val_thresh(0.2)
+
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken 
 ```
 
 ### 6. ROC and AUC 
