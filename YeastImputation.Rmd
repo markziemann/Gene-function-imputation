@@ -85,9 +85,6 @@ diff_Cluster1.GO <- setdiff(cluster1_list, cluster1_GOList)
 # Use function, wcorr_cluster, to get the weighted values for all blinded genes in cluster 1
 cluster1_wGO <- wcorr_cluster(cluster1_list, corr_cluster1, cluster1_GO_terms)
 
-# Determining threshold based on histogram
-hist(cluster1_wGO[[1]])
-
 # Convert output into a data frame with columns as GO terms and rows as gene names
 cluster1_wGO_df <- as.data.frame(do.call(rbind, cluster1_wGO))
 cluster1_wGO_df <- cluster1_wGO_df[order(rownames(cluster1_wGO_df)),]
@@ -190,6 +187,7 @@ myclClusters_df <- function(hr, cutree_values){
         mycl <- cutree(hr, h=max(hr$height/div))
         clusters <- as.data.frame(mycl)
         colnames(clusters) <- "ClusterNumber"
+        clusters$GeneID <- rownames(clusters)
         
         a <- as.numeric(names(cutree_values[i]))
         tally <- list()

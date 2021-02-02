@@ -185,7 +185,8 @@ GO_list_perCl <- function(x,clust_total){
   GO_names <- list()
   
   for (i in 1:clust_total){
-    input <- x[[i]][["Input"]]
+    #input <- x[[i]][["Input"]]
+    input <- x[[i]]
     GO_list <- colnames(input)
     
     GO_names[[paste0("Cluster", i)]] <- GO_list
@@ -272,6 +273,17 @@ impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
     gene_list <- rownames(corr_cl)
     
     cl_go <- cl_GOall[[i]]
+    
+    #If all the genes in the cluster have no GOs and the matrix is empty
+    if (is_empty(cl_go) == TRUE){
+      wGO_list[[paste0("Cluster", i)]][[paste0("Comment")]] <- "No Gene Ontologies found"
+      wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- 0
+      wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- 0
+      wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- 0
+      
+      next
+    }
+    
     # should add gene that are not included in the GO data otherwise merge 
     # will yield weird results
     diff_go_genes <- setdiff(gene_list,rownames(cl_go))
