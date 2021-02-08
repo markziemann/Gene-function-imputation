@@ -248,29 +248,39 @@ wGO_blinded20 <- impute(cl_GOall=GOterms_perCl20,
                         clust_total=20, thresh=0)
 
 # stats for thresholds 
+wGO_allClusters20_10 <- impute(cl_GOall = GOterms_perCl20, 
+                        corr_clAll = corr_allClusters20,
+                        clust_total = 20, thresh = 0.1)
 kfold20_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster20,
                        GO_list_perCl=GO_list_perCl20, 
                        corr_clAll=corr_allClusters20,
-                       wGO_allClusters=wGO_allClusters20,
+                       wGO_allClusters=wGO_allClusters20_10,
                        clust_total=20, thresh=0.1)
 saveRDS(kfold20_10, "kfold20_10.rds")
 
+
+
+wGO_allClusters20_40 <- impute(cl_GOall = GOterms_perCl20, 
+                        corr_clAll = corr_allClusters20,
+                        clust_total = 20, thresh = 0.4)
 kfold20_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster20,
                        GO_list_perCl=GO_list_perCl20, 
                        corr_clAll=corr_allClusters20,
-                       wGO_allClusters=wGO_allClusters20,
+                       wGO_allClusters=wGO_allClusters20_40,
                        clust_total=20, thresh=0.4)
 saveRDS(kfold20_40, "kfold20_40.rds")
 
+
+
 start.time <- Sys.time()
-wGO_allClusters20 <- impute(cl_GOall = GOterms_perCl20, 
+wGO_allClusters20_80 <- impute(cl_GOall = GOterms_perCl20, 
      corr_clAll = corr_allClusters20,
      clust_total = 20, thresh = 0.8)
 
 kfold20_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster20,
                        GO_list_perCl=GO_list_perCl20, 
                        corr_clAll=corr_allClusters20,
-                       wGO_allClusters=wGO_allClusters20,
+                       wGO_allClusters=wGO_allClusters20_80,
                        clust_total=20, thresh=0.8)
 saveRDS(kfold20_80, "kfold20_80.rds")
 end.time <- Sys.time()
@@ -332,21 +342,6 @@ time.taken
 cluster200 <- clTotals_dfs[["200"]][["ClusterNum"]]
 corr_allClusters200 <- corr_per_clust(logcounts, cluster200, 200)
 GOterms_perCl200 <- GO_per_cl(GO_table, cluster200, 200)
-
-GO_per_cl <- function(GO_annot=GO_table, clusters=cluster200, clust_total=200){
-  GO_cl <- list()
-  for (i in 1:clust_total){
-    clusterX <- clusters[clusters$ClusterNumber == i,]
-    cluster_list <- as.list(clusterX$GeneID)
-    cluster_GOterms <- GO_annot[GO_annot$GeneID %in% cluster_list,]
-    rownames(cluster_GOterms)<- cluster_GOterms[,1] 
-    cluster_GOterms[,1] <- c()
-    cluster_GOterms <- cluster_GOterms[,which(colSums(cluster_GOterms) > 0)]
-    GO_cl[[paste0("Cluster", i)]] <- cluster_GOterms
-  }
-  return(GO_cl)
-}
-
 GO_list_perCl200 <- GO_list_perCl(GOterms_perCl200, 200)
 
 GO_blindedClusters200 <- GO_per_cl_blinded(GO_blinded, 
@@ -370,16 +365,18 @@ impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
     corr_cl <- corr_cl[,order(colnames(corr_cl))]
     gene_list <- rownames(corr_cl)
     
-    cl_go <- cl_GOall[[1]]
+    cl_go <- cl_GOall[[i]]
     
+    #If all the genes in the cluster have no GOs and the matrix is empty
     if (is_empty(cl_go) == TRUE){
-        wGO_list[[paste0("Cluster", i)]][[paste0("Comment")]] <- "No Gene Ontologies found"
-        wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- 0
-        wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- 0
-        wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- 0
-        
-        next
+      wGO_list[[paste0("Cluster", i)]][[paste0("Comment")]] <- "No Gene Ontologies found"
+      wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- 0
+      wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- 0
+      wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- 0
+      
+      next
     }
+    
     # should add gene that are not included in the GO data otherwise merge 
     # will yield weird results
     diff_go_genes <- setdiff(gene_list,rownames(cl_go))
@@ -391,7 +388,6 @@ impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
     cl_go <- cl_go[,order(colnames(cl_go))]
     
     wGO_cl <- wcorr_cluster(gene_list=gene_list, corr_cl=corr_cl, cl_GO=cl_go)
-    print(i)
     wGO_df <- as.data.frame(do.call(rbind, wGO_cl))
     wGO_thresh <- (as.matrix(wGO_df) > thresh)*1 
     wGO_thresh <- wGO_thresh[order(rownames(wGO_thresh)),]
@@ -415,6 +411,66 @@ kfold200_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster200,
                        wGO_allClusters=wGO_allClusters200_10,
                        clust_total=200, thresh=0.1)
 saveRDS(kfold200_10, "kfold200_10.rds")
+
+
+stats_cl <- function(input_df=wGO_allClusters, blinded_df=wGO_blinded, clust_total=200){
+  stats_list <- list()
+  
+  for (i in 1:clust_total){
+    input <- input_df[[i]][["Input"]]
+    blind <- blinded_df[[i]][["Diff"]]
+    
+    diff <- input - blind 
+    sum <- input + blind
+    
+    TP <- length(which(sum == 2)) #True positive
+    TN <- length(which(sum == 0)) #True negative
+    FP <- length(which(diff == -1)) #False positive
+    FN <- length(which(diff == 1)) #False negative
+    
+    # False negative rate (FNR)
+    FNR <- FN/(FN+TP)
+    # Sensitivity/True Positive Rate (TPR)
+    TPR <- 1 - FNR
+    # False Positive Rate (FPR)
+    FPR <- FP/(FP+TN)
+    # Specificity/True Negative Rate (TNR)
+    TNR <- 1 - FPR
+    # Precision/Positive Predictive Value (PPV)
+    PPV <- TP/(TP+FP)
+    # accuracy (ACC)
+    ACC <- (TP+TN)/(TP+TN+FP+FN)
+    # F1 score (is the harmonic mean of precision and sensitivity)
+    F1 <- (2*TP)/((2*TP)+FP+FN)
+    
+    stats_list[[paste0("Cluster", i)]][[paste0("TP")]] <- TP
+    stats_list[[paste0("Cluster", i)]][[paste0("TN")]] <- TN
+    stats_list[[paste0("Cluster", i)]][[paste0("FP")]] <- FP
+    stats_list[[paste0("Cluster", i)]][[paste0("FN")]] <- FN
+    
+    stats_list[[paste0("Cluster", i)]][[paste0("Sensitivity (TPR)")]] <- TPR
+    stats_list[[paste0("Cluster", i)]][[paste0("Specificity (TNR)")]] <- TNR
+    stats_list[[paste0("Cluster", i)]][[paste0("Precision (PPV)")]] <- PPV
+    stats_list[[paste0("Cluster", i)]][[paste0("Accuracy (ACC)")]] <- ACC
+    stats_list[[paste0("Cluster", i)]][[paste0("F1_Score")]] <- F1
+  }
+  return(stats_list)
+}
+
+
+GO_per_cl_blinded <- function(x=wGO_blinded, y=GO_list_perCl, clust_total=200){
+  GO_cl <- list()
+  for (i in 1:clust_total){
+    clusterX <- y[y$ClusterNumber == i,]
+    cluster_list <- as.list(clusterX$GeneID)
+    cluster_GOterms <- x[x$GeneID %in% cluster_list,]
+    rownames(cluster_GOterms)<- cluster_GOterms[,1] 
+    cluster_GOterms[,1] <- c()
+    cluster_GOterms <- cluster_GOterms[, colnames(cluster_GOterms) %in% GO_list_perCl[[i]] ]
+    GO_cl[[paste0("Cluster", i)]] <- cluster_GOterms
+  }
+  return(GO_cl)
+}
 
 
 wGO_allClusters200_40 <- impute(cl_GOall = GOterms_perCl200, 
@@ -487,6 +543,88 @@ saveRDS(kfold500_80, "kfold500_80.rds")
 end.time <- Sys.time()
 time.taken <- end.time - start.time
 time.taken
+
+
+# ---------------------- for 300 clusters (run inputs)
+cluster300 <- clTotals_dfs[["300"]][["ClusterNum"]]
+corr_allClusters300 <- corr_per_clust(logcounts, cluster300, 300)
+GOterms_perCl300 <- GO_per_cl(GO_table, cluster300, 300)
+GO_list_perCl300 <- GO_list_perCl(GOterms_perCl300, 300)
+
+GO_blindedClusters300 <- GO_per_cl_blinded(GO_blinded, 
+                        cluster300, GO_list_perCl300, 300)
+
+# stats for thresholds 
+wGO_allClusters300_10 <- impute(cl_GOall = GOterms_perCl300, 
+                        corr_clAll = corr_allClusters300,
+                        clust_total = 300, thresh = 0.1)
+kfold300_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster300,
+                       GO_list_perCl=GO_list_perCl300, 
+                       corr_clAll=corr_allClusters300,
+                       wGO_allClusters=wGO_allClusters300_10,
+                       clust_total=300, thresh=0.1)
+saveRDS(kfold300_10, "kfold300_10.rds")
+
+
+wGO_allClusters300_40 <- impute(cl_GOall = GOterms_perCl300, 
+                        corr_clAll = corr_allClusters300,
+                        clust_total = 300, thresh = 0.4)
+kfold300_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster300,
+                       GO_list_perCl=GO_list_perCl300, 
+                       corr_clAll=corr_allClusters300,
+                       wGO_allClusters=wGO_allClusters300_40,
+                       clust_total=300, thresh=0.4)
+saveRDS(kfold300_40, "kfold300_40.rds")
+
+start.time <- Sys.time()
+wGO_allClusters300_80 <- impute(cl_GOall = GOterms_perCl300, 
+                        corr_clAll = corr_allClusters300,
+                        clust_total = 300, thresh = 0.8)
+
+kfold300_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster300,
+                       GO_list_perCl=GO_list_perCl300, 
+                       corr_clAll=corr_allClusters300,
+                       wGO_allClusters=wGO_allClusters300_80,
+                       clust_total=300, thresh=0.8)
+saveRDS(kfold300_80, "kfold300_80.rds")
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+
+
+
+```
+
+### 7. Visualizations
+
+```{r}
+
+# correlations of the counts
+
+corr_logcounts <- cor(t(logcounts))
+
+# Visualizations
+if (!exists("P100")){
+  P100 <- createPalette(100,  c("#ff0000", "#00ff00", "#0000ff"))}
+
+clusterCols <- P100[1:mycl_length]
+myClusterSideBar <- clusterCols[mycl]
+colfunc <- colorRampPalette(c("blue", "white", "red"))
+
+# create a 5 x 5 inch png image
+png("Data/yeast_heatmaps_PASS_normalization3.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+
+# create the heatmap
+heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
+          dendrogram="both", scale="column", col = colfunc(25), trace="none",
+          RowSideColors= myClusterSideBar, margins = c(5,5))
+
+dev.off()
+
+# create the heatmap
+heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
+          dendrogram="both", scale="column", col = colfunc(25), trace="none",
+          RowSideColors= myClusterSideBar, margins = c(5,5))
 
 ```
 

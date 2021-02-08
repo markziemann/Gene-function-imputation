@@ -516,6 +516,7 @@ cross_val <- function(n, GO_annot, clusters,
     stats_final <- stats_all(stats_perCl)
     
     stats[[paste0("Fold", i)]] <- stats_final
+    print(i)
   }
   return(stats)
 }
@@ -550,9 +551,7 @@ mycl_opt <- function(hr, cut_min,
       
       if (mycl_length==i){
         mycl_cuts[[paste0(i)]] <- cut
-        print(paste(i, cut))
-      } #else cut = round((cut + 0.00001), digits = 4)
-      else cut = cut + 0.0001           
+      } else cut = cut + 0.0001           
     }
   }
   return(mycl_cuts)
