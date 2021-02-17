@@ -25,6 +25,7 @@ suppressPackageStartupMessages({
     library(Polychrome)
     library(tidyverse)
     library(caret)
+    library(ggplot2)
 })
 
 source("functions.R")
@@ -599,32 +600,150 @@ time.taken
 
 ```{r}
 
-# correlations of the counts
-
+# correlations of the counts (Pearson - default; Spearman)
 corr_logcounts <- cor(t(logcounts))
+saveRDS(corr_logcounts,"corr_logcounts.rds")
 
-# Visualizations
-if (!exists("P100")){
-  P100 <- createPalette(100,  c("#ff0000", "#00ff00", "#0000ff"))}
+corr_logcounts_spearman <- cor(t(logcounts), method = "spearman")
+saveRDS(corr_logcounts,"corr_logcounts_spearman.rds")
 
-clusterCols <- P100[1:mycl_length]
-myClusterSideBar <- clusterCols[mycl]
-colfunc <- colorRampPalette(c("blue", "white", "red"))
+# creates a own color palette from red to green
+my_palette <- colorRampPalette(c("red", "yellow", "green"))
 
-# create a 5 x 5 inch png image
-png("Data/yeast_heatmaps_PASS_normalization3.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+# (optional) defines the color breaks manually for a "skewed" color transition
+col_breaks = c(seq(-1,0,length=100),  # for red
+  seq(0.01,0.8,length=100),           # for yellow
+  seq(0.81,1,length=100))             # for green
 
-# create the heatmap
-heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
-          dendrogram="both", scale="column", col = colfunc(25), trace="none",
-          RowSideColors= myClusterSideBar, margins = c(5,5))
+start.time <- Sys.time()
+png("Data/yeast_heatmaps_PASS_corrlogcounts2.png",    # create PNG for the heat map        
+  width = 5*300,        # 5 x 300 pixels
+  height = 5*300,
+  res = 300,            # 300 pixels per inch
+  pointsize = 8)        # smaller font size
 
-dev.off()
+heatmap.2(corr_logcounts,
+  main = "Correlation of Counts", # heat map title
+  margins =c(5,5),     # widens margins around plot
+  col=my_palette,       # use on color palette defined earlier
+  breaks=col_breaks,    # enable color transition at specified limits
+  trace="none",
+  dendrogram="row",     # only draw a row dendrogram
+  Colv="NA")            # turn off column clustering
 
-# create the heatmap
-heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
-          dendrogram="both", scale="column", col = colfunc(25), trace="none",
-          RowSideColors= myClusterSideBar, margins = c(5,5))
+
+dev.off()          
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+
+
+# histogram - Pearson Method
+png("Data/yeast_histograms_PASS_corrlogcounts.png",    # create PNG for the heat map        
+  width = 5*300,        # 5 x 300 pixels
+  height = 5*300,
+  res = 300,            # 300 pixels per inch
+  pointsize = 8)        # smaller font size
+
+hist(corr_logcounts, 
+     main="Correlation of Counts (Pearson Method)", 
+     xlab="Normalised RNA Seq Counts") 
+
+dev.off()          
+
+# histogram - Spearman Method
+png("Data/yeast_histograms_PASS_corrlogcounts_spearman.png",       
+  width = 5*300,        # 5 x 300 pixels
+  height = 5*300,
+  res = 300,            # 300 pixels per inch
+  pointsize = 8)        # smaller font size
+
+hist(corr_logcounts, 
+     main="Correlation of Counts (Spearman Method)", 
+     xlab="Normalised RNA Seq Counts") 
+
+dev.off()          
+
+
+# cut tree value vs Total Clusters – line diagram  
+cuttree_totals_df <- do.call(rbind.data.frame, cuttree_totals)
+cuttree_totals_df$ClTot <- seq(from = 20, to = 2000, by = 2)
+colnames(cuttree_totals_df)[1] <- "CuttreeVal"
+
+png("Data/yeast_line_PASS_cuttree_vs_clTotal.png",       
+  width = 5*300,        # 5 x 300 pixels
+  height = 5*300,
+  res = 300,            # 300 pixels per inch
+  pointsize = 8)        # smaller font size
+
+ggplot(cuttree_totals_df, aes(x=CuttreeVal, y=ClTot)) +
+  geom_line() + ylab("Total Number of Clusters") + 
+  xlab("Cuttree Values") +
+  ggtitle("Cuttree Value vs Total Number of Clusters") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+dev.off()   
+
+
+# Total genes per cluster  – line diagram  
+clTotals <- do.call(rbind.data.frame, sapply(clTotals_dfs, "[[", 2))
+clTotals$ClTot <- as.factor(as.numeric(str_extract_all(rownames(clTotals), "^[:digit:]*(?=.)")))
+clTotals$ClNum <- as.numeric(str_extract_all(rownames(clTotals), "(?=.)\\d+$"))
+colnames(clTotals)[1] <- "GeneTot"
+rownames(clTotals) <- c()
+
+
+png("Data/yeast_violin_PASS_genesPerCl2.png",       
+  width = 5*300,        # 5 x 300 pixels
+  height = 5*300,
+  res = 300,            # 300 pixels per inch
+  pointsize = 8)        # smaller font size        
+
+ggplot(clTotals, aes(x=ClNum, y=GeneTot, color=ClTot)) +
+  geom_violin(trim=FALSE) + ylab("Total Number of Genes") + 
+  xlab("Cluster Number") +
+  ggtitle("Total Number of Genes per Cluster") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position="none")
+
+dev.off()   
+
+```
+
+### 8. GO Summary
+
+```{r}
+
+no_ontologies1 <- setdiff(unique(rownames(agg)),unique(GO_table$GeneID))
+no_ontologies2 <- which(rowSums(GO_table[,2:length(GO_table)]) == 0)
+
+length(no_ontologies1)
+length(no_ontologies2) 
+
+
+
+summary_sweep <- do.call(rbind.data.frame, lapply(kfold20_10, function(x) {x[length(x)]}))
+colnames(summary_sweep)[1] <- "k20_10.F1_Score"
+summary_sweep$k20_40 <- do.call(rbind.data.frame, lapply(kfold20_40, function(x) {x[length(x)]}))
+summary_sweep$k20_80 <- do.call(rbind.data.frame, lapply(kfold20_80, function(x) {x[length(x)]}))
+summary_sweep$k50_10 <- do.call(rbind.data.frame, lapply(kfold50_10, function(x) {x[length(x)]}))
+summary_sweep$k50_40 <- do.call(rbind.data.frame, lapply(kfold50_40, function(x) {x[length(x)]}))
+summary_sweep$k50_80 <- do.call(rbind.data.frame, lapply(kfold50_80, function(x) {x[length(x)]}))
+summary_sweep$k200_10 <- do.call(rbind.data.frame, lapply(kfold200_10, function(x) {x[length(x)]}))
+summary_sweep$k200_40 <- do.call(rbind.data.frame, lapply(kfold200_40, function(x) {x[length(x)]}))
+summary_sweep$k200_80 <- do.call(rbind.data.frame, lapply(kfold200_80, function(x) {x[length(x)]}))
+summary_sweep$k300_10 <- do.call(rbind.data.frame, lapply(kfold300_10, function(x) {x[length(x)]}))
+summary_sweep$k300_40 <- do.call(rbind.data.frame, lapply(kfold300_40, function(x) {x[length(x)]}))
+summary_sweep$k300_80 <- do.call(rbind.data.frame, lapply(kfold300_80, function(x) {x[length(x)]}))
+summary_sweep$k500_10 <- do.call(rbind.data.frame, lapply(kfold500_10, function(x) {x[length(x)]}))
+summary_sweep$k500_40 <- do.call(rbind.data.frame, lapply(kfold500_40, function(x) {x[length(x)]}))
+summary_sweep$k500_80 <- do.call(rbind.data.frame, lapply(kfold500_80, function(x) {x[length(x)]}))
+
+Mean.F1_Score <- colMeans(summary_sweep)
+summary_sweep <- rbind(summary_sweep, Mean.F1_Score)
+rownames(summary_sweep)[rownames(summary_sweep) == "11"] <- "Mean.F1_Score"
+saveRDS(summary_sweep, "summary_sweep.rds")
+
 
 ```
 
