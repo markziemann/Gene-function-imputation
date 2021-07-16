@@ -44,8 +44,7 @@ file_GO_allClusters <- "GOterms_allClusters.rds"
 file_corr_allClusters <- "corr_allClusters.rds"
 file_wGO_allClusters <- "wGO_allClusters.rds"
 file_GOterms_perCl <- "GOterms_perCl.rds"
-file_cluster_cuts <- "cluster_cuts.rds"
-file_clTotals_dfs <- "clTotals_dfs.rds"
+file_cuttree_values <- "cuttree_values.rds"
 
 logcounts <- readRDS(file_logcounts_PASS)
 agg <- readRDS(file_agg)
@@ -55,8 +54,7 @@ GO_allClusters <-  readRDS(file_GO_allClusters)
 corr_allClusters <-  readRDS(file_corr_allClusters)
 wGO_allClusters <- readRDS(file_wGO_allClusters)
 GOterms_perCl <- readRDS(file_GOterms_perCl)
-cluster_cuts <- readRDS(file_cluster_cuts)
-clTotals_dfs <- readRDS(file_clTotals_dfs) 
+cuttree_values <- readRDS(file_cuttree_values) 
 ```
 
 ### 1. Blinding known GO terms
@@ -749,9 +747,14 @@ dev.off()
 
 
 # cut tree value vs Total Clusters – line diagram  
-cuttree_totals_df <- do.call(rbind.data.frame, cuttree_totals)
-cuttree_totals_df$ClTot <- seq(from = 20, to = 2000, by = 2)
-colnames(cuttree_totals_df)[1] <- "CuttreeVal"
+cuttree_totals_df <- as.data.frame(as.numeric(names(cuttree_values)))
+m <- list()
+for (i in 1:length(cuttree_values)){
+  x <- cuttree_values[[i]][["Cut_value"]]
+  m[[i]] <- x
+}
+cuttree_totals_df$CuttreeVal <- as.numeric(m)
+colnames(cuttree_totals_df)[1] <- "ClTot"
 
 png("Data/yeast_line_PASS_cuttree_vs_clTotal.png",       
   width = 5*300,        # 5 x 300 pixels
@@ -769,7 +772,7 @@ dev.off()
 
 
 # Total genes per cluster  – line diagram  
-clTotals <- do.call(rbind.data.frame, sapply(clTotals_dfs, "[[", 2))
+clTotals <- do.call(rbind.data.frame, sapply(cuttree_values, "[[", 3))
 clTotals$ClTot <- as.factor(as.numeric(str_extract_all(rownames(clTotals), "^[:digit:]*(?=.)")))
 clTotals$ClNum <- as.numeric(str_extract_all(rownames(clTotals), "(?=.)\\d+$"))
 colnames(clTotals)[1] <- "GeneTot"
