@@ -135,19 +135,28 @@ cl_lengthCut <- function(hr, min, max, interval){
   cut <- seq(from = min, to = max, by = interval)
   
   for (i in cut){
-    # optimizing the cluster size
-    mycl <- cutree(hr, h=max(hr$height/i))
-    # Check the number of clusters. Can be adjusted by changing the h=max denominator
-    mycl_length <- length(unique(mycl))
+    mycl_length <- length(unique(cutree(hr, h=max(hr$height/i))))
     
     # Prepare Cluster data frame
     clusters <- as.data.frame(mycl)
     colnames(clusters) <- "ClusterNumber"
-    
-    # make a new column, GeneID, from rownames
     clusters$GeneID <- rownames(clusters)
     
-    mycl_cuts[[paste0("Cluster", mycl_length)]] <- clusters
+    # Tally the total GeneIDs assigned per cluster
+    a <- as.numeric(mycl_length)
+    tally <- list()
+    for (j in 1:a) {
+      
+      tot <- length(which(clusters$ClusterNumber == j))
+      tally[[j]] <- tot
+    }
+    
+    tallyDF <- t(as.data.frame(tally))
+    rownames(tallyDF) <- c(1:a)
+    
+    mycl_cuts[[paste0(mycl_length)]][[paste0("GeneID_assignments")]] <- clusters
+    mycl_cuts[[paste0(mycl_length)]][[paste0("Cut_value")]] <- i
+    mycl_cuts[[paste0(mycl_length)]][["Tally"]] <- tallyDF
   }
   return(mycl_cuts)
 }
@@ -185,7 +194,27 @@ GO_list_perCl <- function(x,clust_total){
   GO_names <- list()
   
   for (i in 1:clust_total){
-    #input <- x[[i]][["Input"]]
+    input <- x[[i]][["Input"]]
+    GO_list <- colnames(input)
+    
+    GO_names[[paste0("Cluster", i)]] <- GO_list
+  }
+  return(GO_names)
+}
+
+
+# This is a derivative of the GO_list_perCl fuction modified to accomodate
+# The different input data structure of the blinded genes
+# This function's output is a nested list of GO terms (column names) grouped 
+# per cluster from the original input data frame before blinding
+# Input:
+# x = list object containing the input data frame before blinding
+# clust_total = total number of clusters
+
+GO_list_perClBlind <- function(x,clust_total){
+  GO_names <- list()
+  
+  for (i in 1:clust_total){
     input <- x[[i]]
     GO_list <- colnames(input)
     
@@ -193,6 +222,7 @@ GO_list_perCl <- function(x,clust_total){
   }
   return(GO_names)
 }
+
 
 
 # This function's output is a list of data frames containing all 
@@ -265,6 +295,17 @@ impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
   for (i in 1:clust_total){
     
     GO_list <- rownames(cl_GOall[[i]])
+    
+    #If all the genes in the cluster have no GOs and the matrix is empty
+    if (is_empty(GO_list) == TRUE){
+      wGO_list[[paste0("Cluster", i)]][[paste0("Comment")]] <- "No Gene Ontologies found"
+      wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- 0
+      wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- 0
+      wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- 0
+      
+      next
+    }
+    
     GO_list <- GO_list[order(GO_list)]
     
     corr_cl <- corr_clAll[[i]]
@@ -345,7 +386,7 @@ impute_viz <- function(clust_total, wGO_allCl){
     # create heatmap for subtraction df
     wGO_heatmaps[[paste0("Cluster", i)]][[paste0("Diff")]] <- 
       heatmap.2(as.matrix(wGO_allCl[[i]][["Diff"]]), main=paste0("S.cerevisiae Cluster ", 
-          i, " GO Terms vs Imputed GO Terms"), scale="none", col = colfunc(25), 
+                                                                 i, " GO Terms vs Imputed GO Terms"), scale="none", col = colfunc(25), 
                 trace="none", margins = c(5,5))
   }
   return(wGO_heatmaps)
@@ -397,10 +438,10 @@ stats_cl <- function(input_df, blinded_df, clust_total){
     stats_list[[paste0("Cluster", i)]][[paste0("FP")]] <- FP
     stats_list[[paste0("Cluster", i)]][[paste0("FN")]] <- FN
     
-    stats_list[[paste0("Cluster", i)]][[paste0("Sensitivity (TPR)")]] <- TPR
-    stats_list[[paste0("Cluster", i)]][[paste0("Specificity (TNR)")]] <- TNR
-    stats_list[[paste0("Cluster", i)]][[paste0("Precision (PPV)")]] <- PPV
-    stats_list[[paste0("Cluster", i)]][[paste0("Accuracy (ACC)")]] <- ACC
+    stats_list[[paste0("Cluster", i)]][[paste0("Sensitivity(TPR)")]] <- TPR
+    stats_list[[paste0("Cluster", i)]][[paste0("Specificity(TNR)")]] <- TNR
+    stats_list[[paste0("Cluster", i)]][[paste0("Precision(PPV)")]] <- PPV
+    stats_list[[paste0("Cluster", i)]][[paste0("Accuracy(ACC)")]] <- ACC
     stats_list[[paste0("Cluster", i)]][[paste0("F1_Score")]] <- F1
   }
   return(stats_list)
@@ -419,7 +460,7 @@ stats_all <- function(stats_cl){
   
   # Transform nested list to data frame
   stats_df <- as.data.frame(t(as.data.frame(
-              lapply(stats_cl, unlist))))
+    lapply(stats_cl, unlist))))
   
   TP <- sum(stats_df$TP) #True positive
   TN <- sum(stats_df$TN) #True negative
@@ -493,7 +534,7 @@ cross_val <- function(n, GO_annot, clusters,
   folds <- sample(1:nfolds, nrow(GO_annot), replace = TRUE)
   
   dict_folds <- data.frame(GO_annot$GeneID, folds)
-  saveRDS(dict_blind, "dict_folds.rds")
+  saveRDS(dict_folds, "dict_folds.rds")
   
   for (i in 1:n){
     which_fold <- i
@@ -516,7 +557,6 @@ cross_val <- function(n, GO_annot, clusters,
     stats_final <- stats_all(stats_perCl)
     
     stats[[paste0("Fold", i)]] <- stats_final
-    print(i)
   }
   return(stats)
 }
@@ -545,13 +585,11 @@ mycl_opt <- function(hr, cut_min,
     cut = cut_min
     mycl_length = 0
     while (mycl_length!=i) {
-      #mycl <- cutree(hr, h=max(hr$height/cut))
-      # Check the number of clusters
       mycl_length <- length(unique(cutree(hr, h=max(hr$height/cut))))
       
       if (mycl_length==i){
         mycl_cuts[[paste0(i)]] <- cut
-      } else cut = cut + 0.0001           
+      } else cut = cut + interval           
     }
   }
   return(mycl_cuts)
