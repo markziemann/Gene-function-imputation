@@ -147,15 +147,9 @@ heatmap.2(as.matrix(Clust1_subtract), main="S.cerevisiae Cluster 1 GO Terms vs I
 
 # A nested list of gene clusters containing the data generated for cluster analysis. 
 
-start.time <- Sys.time()
-
 wGO_allClusters <- impute(cl_GOall = GO_allClusters, 
      corr_clAll = corr_allClusters,
      clust_total = 100, thresh = 0.02)
-
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
 
 saveRDS(wGO_allClusters, "wGO_allClusters.rds")
 
@@ -168,6 +162,7 @@ wGO_viz <- impute_viz(2, wGO_allClusters)
 
 GOterms_perCl <- GO_list_perCl(wGO_allClusters, 100)
 
+
 # Save the list of GO terms per cluster
 saveRDS(GOterms_perCl, "GOterms_perCl.rds")
 ```
@@ -176,44 +171,13 @@ saveRDS(GOterms_perCl, "GOterms_perCl.rds")
 
 ```{r}
 
-library("svMisc")
-myclClusters_df <- function(hr, cutree_values){
-    
-    mycl_df <- list()
-    
-    for (i in 1:991){ 
-        
-        div <- cutree_values[[i]]
-        mycl <- cutree(hr, h=max(hr$height/div))
-        clusters <- as.data.frame(mycl)
-        colnames(clusters) <- "ClusterNumber"
-        clusters$GeneID <- rownames(clusters)
-        
-        a <- as.numeric(names(cutree_values[i]))
-        tally <- list()
-        for (j in 1:a) {
-           
-           tot <- length(which(clusters$ClusterNumber == j))
-           tally[[j]] <- tot
-        }
-        
-        tallyDF <- t(as.data.frame(tally))
-        rownames(tallyDF) <- c(1:a)
-        
-        mycl_df[[names(cutree_values[i])]][["ClusterNum"]] <- clusters
-        mycl_df[[names(cutree_values[i])]][["Tally"]] <- tallyDF
-            
-            
-        progress(i)
-        Sys.sleep(0.01)
-                       
-    }
-   return(mycl_df)
-}
+# Different cluster sizes can produced through passing a list 
+# of numbers as denominators of hr$height  
 
+# Determine min-max cut value through trial and error to get 20 to 2000 total clusters
+cuttree_values <- cl_lengthCut(hr=hr, min=1.297, max=3.378, interval=0.001)
+saveRDS(cuttree_values, "cuttree_values.rds")
 
-clTotals_dfs <- myclClusters_df(hr=hr, cutree_values=cuttree_totals)
-saveRDS(clTotals_dfs_1, "clTotals_dfs.rds")
 
 ```
 
