@@ -254,15 +254,22 @@ filename <- "logcounts_PASS.rds"
 logcounts <- readRDS(filename)
 
 # Hierarchical Clustering
+# set seed = 42 for reproducibility of clustering
+
+set.seed(42)
 cl <-as.dist(1-cor(t(logcounts), method="spearman"))
 hr <- hclust(cl , method="complete")
 saveRDS(hr, "hr_PASS.rds")
 
 # optimizing the cluster size
-mycl <- cutree(hr, h=max(hr$height/1.324))
+# 1.605 was determined by trial and error to get 100 total 
+# clusters as a starting point of analysis
+
+mycl_length <- length(unique(cutree(hr, h=max(hr$height/1.605))))
+
 # Check the number of clusters. Can be adjusted by changing the h=max denominator
-mycl_length <- length(unique(mycl))
 mycl_length
+
 # Save the clusters value 
 saveRDS(mycl, "mycl_PASS.rds")
 
