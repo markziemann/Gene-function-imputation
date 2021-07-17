@@ -97,11 +97,11 @@ wGO_blinded <- impute(cl_GOall = GO_blindedClusters,
      clust_total = 100, thresh = 0.02)
 
 # for 20 clusters
-cluster20 <- clTotals_dfs[["20"]][["ClusterNum"]]
+cluster20 <- cuttree_values[["20"]][["GeneID_assignments"]]
 corr_allClusters20 <- corr_per_clust(logcounts, cluster20, 20)
 
 GOterms_perCl20 <- GO_per_cl(GO_table, cluster20, 20)
-GO_list_perCl20 <- GO_list_perCl(GOterms_perCl20, 20)
+GO_list_perCl20 <- GO_list_perClBlind(GOterms_perCl20, 20)
 
 GO_blindedClusters20 <- GO_per_cl_blinded(GO_blinded, 
                         cluster20, GO_list_perCl20, 20)
@@ -132,8 +132,6 @@ stats_perCl20 <- stats_cl(wGO_allClusters20, wGO_blinded20, 20)
 
 stats_final20 <- stats_all(stats_perCl20)
 
-stats_final3
-
 # does not work for other R server (R version 3.6.3 (2020-02-29)
 # Platform: x86_64-pc-linux-gnu (64-bit))
 # stats_df2 <- do.call(rbind.data.frame, stats_perCl)
@@ -141,7 +139,6 @@ stats_final3
 # works for both servers
 stats_df20 <- as.data.frame(t(as.data.frame(lapply(stats_perCl20, unlist))))
 
-sum(stats_df$TP)
 
 ```
 
@@ -234,11 +231,13 @@ time.taken # 5.564071 hours
 ```{r}
 # Coarse sweep of the following parameters: cluster total(20, 50, 200, 500) and threshold (0.1, 0.4, 0.8)
 
+#cuttree_values[["32"]][["GeneID_assignments"]]
+
 # ---------------------- for 20 clusters (run inputs)
-cluster20 <- clTotals_dfs[["20"]][["ClusterNum"]]
+cluster20 <- cuttree_values[["20"]][["GeneID_assignments"]]
 corr_allClusters20 <- corr_per_clust(logcounts, cluster20, 20)
 GOterms_perCl20 <- GO_per_cl(GO_table, cluster20, 20)
-GO_list_perCl20 <- GO_list_perCl(GOterms_perCl20, 20)
+GO_list_perCl20 <- GO_list_perClBlind(GOterms_perCl20, 20)
 
 GO_blindedClusters20 <- GO_per_cl_blinded(GO_blinded, 
                         cluster20, GO_list_perCl20, 20)
@@ -288,10 +287,10 @@ time.taken <- end.time - start.time
 time.taken
 
 # ---------------------- for 50 clusters (run inputs)
-cluster50 <- clTotals_dfs[["50"]][["ClusterNum"]]
+cluster50 <- cuttree_values[["50"]][["GeneID_assignments"]]
 corr_allClusters50 <- corr_per_clust(logcounts, cluster50, 50)
 GOterms_perCl50 <- GO_per_cl(GO_table, cluster50, 50)
-GO_list_perCl50 <- GO_list_perCl(GOterms_perCl50, 50)
+GO_list_perCl50 <- GO_list_perClBlind(GOterms_perCl50, 50)
 
 GO_blindedClusters50 <- GO_per_cl_blinded(GO_blinded, 
                         cluster50, GO_list_perCl50, 50)
@@ -339,10 +338,10 @@ time.taken
 
 
 # ---------------------- for 200 clusters (run inputs)
-cluster200 <- clTotals_dfs[["200"]][["ClusterNum"]]
+cluster200 <- cuttree_values[["200"]][["GeneID_assignments"]]
 corr_allClusters200 <- corr_per_clust(logcounts, cluster200, 200)
 GOterms_perCl200 <- GO_per_cl(GO_table, cluster200, 200)
-GO_list_perCl200 <- GO_list_perCl(GOterms_perCl200, 200)
+GO_list_perCl200 <- GO_list_perClBlind(GOterms_perCl200, 200)
 
 GO_blindedClusters200 <- GO_per_cl_blinded(GO_blinded, 
                         cluster200, GO_list_perCl200, 200)
@@ -499,10 +498,10 @@ time.taken <- end.time - start.time
 time.taken
 
 # ---------------------- for 500 clusters (run inputs)
-cluster500 <- clTotals_dfs[["500"]][["ClusterNum"]]
+cluster500 <- cuttree_values[["500"]][["GeneID_assignments"]]
 corr_allClusters500 <- corr_per_clust(logcounts, cluster500, 500)
 GOterms_perCl500 <- GO_per_cl(GO_table, cluster500, 500)
-GO_list_perCl500 <- GO_list_perCl(GOterms_perCl500, 500)
+GO_list_perCl500 <- GO_list_perClBlind(GOterms_perCl500, 500)
 
 GO_blindedClusters500 <- GO_per_cl_blinded(GO_blinded, 
                         cluster500, GO_list_perCl500, 500)
@@ -546,10 +545,10 @@ time.taken
 
 
 # ---------------------- for 300 clusters (run inputs)
-cluster300 <- clTotals_dfs[["300"]][["ClusterNum"]]
+cluster300 <- cuttree_values[["300"]][["GeneID_assignments"]]
 corr_allClusters300 <- corr_per_clust(logcounts, cluster300, 300)
 GOterms_perCl300 <- GO_per_cl(GO_table, cluster300, 300)
-GO_list_perCl300 <- GO_list_perCl(GOterms_perCl300, 300)
+GO_list_perCl300 <- GO_list_perClBlind(GOterms_perCl300, 300)
 
 GO_blindedClusters300 <- GO_per_cl_blinded(GO_blinded, 
                         cluster300, GO_list_perCl300, 300)
@@ -593,10 +592,10 @@ time.taken
 
 
 # ---------------------- for 100 clusters (run inputs)
-cluster100 <- clTotals_dfs[["100"]][["ClusterNum"]]
+cluster100 <- cuttree_values[["100"]][["GeneID_assignments"]]
 corr_allClusters100 <- corr_per_clust(logcounts, cluster100, 100)
 GOterms_perCl100 <- GO_per_cl(GO_table, cluster100, 100)
-GO_list_perCl100 <- GO_list_perCl(GOterms_perCl100, 100)
+GO_list_perCl100 <- GO_list_perClBlind(GOterms_perCl100, 100)
 
 GO_blindedClusters100 <- GO_per_cl_blinded(GO_blinded, 
                         cluster100, GO_list_perCl100, 100)
@@ -645,154 +644,154 @@ time.taken
 ### 7. Visualizations
 
 ```{r}
-
-# correlations of the counts (Pearson - default; Spearman)
-corr_logcounts <- cor(t(logcounts))
-saveRDS(corr_logcounts,"corr_logcounts.rds")
-
-corr_logcounts_spearman <- cor(t(logcounts), method = "spearman")
-saveRDS(corr_logcounts,"corr_logcounts_spearman.rds")
-
-# Get lower triangle of the correlation matrix
-corr_lowertri <- corr_logcounts
-corr_lowertri[upper.tri(corr_counts_lowertri)] <- NA
-
-# Melt the correlation matrix
-melted_cormat <- melt(corr_lowertri, na.rm = TRUE)
-melted_cormat <- melted_cormat[which(melted_cormat$Var1 != melted_cormat$Var2),]
-melted_cormat <- melted_cormat[which(melted_cormat$value != 1),]
-melted_cormat <- melted_cormat[order(-melted_cormat$value),]
-
-# Heatmap
-png("Data/yeast_heatmaps_PASS_corrlogcounts4.png",    # create PNG for the heat map        
-  width = 5*300,        # 5 x 300 pixels
-  height = 5*300,
-  res = 300,            # 300 pixels per inch
-  pointsize = 8)        # smaller font size
-
-ggplot(data = melted_cormat[1:10000,], aes(Var2, Var1, fill = value))+
- geom_tile(color = "white")+
- scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-   midpoint = 0, limit = c(-1,1), space = "Lab", 
-   name="Pearson\nCorrelation") +
-  theme_minimal()+  
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank()) +
- coord_fixed()
-
-dev.off()         
-
-
-# creates a own color palette from red to green
-#my_palette <- colorRampPalette(c("yellow", "orange", "red"))
-my_palette <- colorRampPalette(c("red", "black", "green"))
-
-
-# (optional) defines the color breaks manually for a "skewed" color transition
-col_breaks = c(seq(-1,0,length=100), # for red
-seq(0.01,0.8,length=100),  # for yellow
-seq(0.81,1,length=100)) # for green
-
-start.time <- Sys.time()
-png("Data/yeast_heatmaps_PASS_corrlogcounts3.png",    # create PNG for the heat map        
-  width = 5*300,        # 5 x 300 pixels
-  height = 5*300,
-  res = 300,            # 300 pixels per inch
-  pointsize = 8)        # smaller font size
-
-heatmap.2(melted_cormat[1:10000,],
-  main = "Correlation of Counts", # heat map title
-  margins =c(5,5),     # widens margins around plot
-  col=my_palette,       # use on color palette defined earlier
-  #breaks=col_breaks,    # enable color transition at specified limits
-  trace="none",
-  dendrogram="both",     # only draw a row dendrogram
-  Rowv=T,
-  Colv=T,
-  symm=F,symkey=F,symbreaks=T, scale="none")            
-
-
-dev.off()          
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-
-
-# histogram - Pearson Method
-png("Data/yeast_histograms_PASS_corrlogcounts.png",    # create PNG for the heat map        
-  width = 5*300,        # 5 x 300 pixels
-  height = 5*300,
-  res = 300,            # 300 pixels per inch
-  pointsize = 8)        # smaller font size
-
-hist(melted_cormat, 
-     main="Correlation of Counts (Pearson Method)", 
-     xlab="Normalised RNA Seq Counts") 
-
-dev.off()          
-
-# histogram - Spearman Method
-png("Data/yeast_histograms_PASS_corrlogcounts_spearman.png",       
-  width = 5*300,        # 5 x 300 pixels
-  height = 5*300,
-  res = 300,            # 300 pixels per inch
-  pointsize = 8)        # smaller font size
-
-hist(corr_logcounts, 
-     main="Correlation of Counts (Spearman Method)", 
-     xlab="Normalised RNA Seq Counts") 
-
-dev.off()          
-
-
-# cut tree value vs Total Clusters – line diagram  
-cuttree_totals_df <- as.data.frame(as.numeric(names(cuttree_values)))
-m <- list()
-for (i in 1:length(cuttree_values)){
-  x <- cuttree_values[[i]][["Cut_value"]]
-  m[[i]] <- x
-}
-cuttree_totals_df$CuttreeVal <- as.numeric(m)
-colnames(cuttree_totals_df)[1] <- "ClTot"
-
-png("Data/yeast_line_PASS_cuttree_vs_clTotal.png",       
-  width = 5*300,        # 5 x 300 pixels
-  height = 5*300,
-  res = 300,            # 300 pixels per inch
-  pointsize = 8)        # smaller font size
-
-ggplot(cuttree_totals_df, aes(x=CuttreeVal, y=ClTot)) +
-  geom_line() + ylab("Total Number of Clusters") + 
-  xlab("Cuttree Values") +
-  ggtitle("Cuttree Value vs Total Number of Clusters") +
-  theme(plot.title = element_text(hjust = 0.5))
-
-dev.off()   
-
-
-# Total genes per cluster  – line diagram  
-clTotals <- do.call(rbind.data.frame, sapply(cuttree_values, "[[", 3))
-clTotals$ClTot <- as.factor(as.numeric(str_extract_all(rownames(clTotals), "^[:digit:]*(?=.)")))
-clTotals$ClNum <- as.numeric(str_extract_all(rownames(clTotals), "(?=.)\\d+$"))
-colnames(clTotals)[1] <- "GeneTot"
-rownames(clTotals) <- c()
-
-
-png("Data/yeast_violin_PASS_genesPerCl2.png",       
-  width = 5*300,        # 5 x 300 pixels
-  height = 5*300,
-  res = 300,            # 300 pixels per inch
-  pointsize = 8)        # smaller font size        
-
-ggplot(clTotals, aes(x=ClNum, y=GeneTot, color=ClTot)) +
-  geom_violin(trim=FALSE) + ylab("Total Number of Genes") + 
-  xlab("Cluster Number") +
-  ggtitle("Total Number of Genes per Cluster") +
-  theme(plot.title = element_text(hjust = 0.5)) +
-  theme(legend.position="none")
-
-dev.off()   
+# 
+# # correlations of the counts (Pearson - default; Spearman)
+# corr_logcounts <- cor(t(logcounts))
+# saveRDS(corr_logcounts,"corr_logcounts.rds")
+# 
+# corr_logcounts_spearman <- cor(t(logcounts), method = "spearman")
+# saveRDS(corr_logcounts,"corr_logcounts_spearman.rds")
+# 
+# # Get lower triangle of the correlation matrix
+# corr_lowertri <- corr_logcounts
+# corr_lowertri[upper.tri(corr_counts_lowertri)] <- NA
+# 
+# # Melt the correlation matrix
+# melted_cormat <- melt(corr_lowertri, na.rm = TRUE)
+# melted_cormat <- melted_cormat[which(melted_cormat$Var1 != melted_cormat$Var2),]
+# melted_cormat <- melted_cormat[which(melted_cormat$value != 1),]
+# melted_cormat <- melted_cormat[order(-melted_cormat$value),]
+# 
+# # Heatmap
+# png("Data/yeast_heatmaps_PASS_corrlogcounts4.png",    # create PNG for the heat map        
+#   width = 5*300,        # 5 x 300 pixels
+#   height = 5*300,
+#   res = 300,            # 300 pixels per inch
+#   pointsize = 8)        # smaller font size
+# 
+# ggplot(data = melted_cormat[1:10000,], aes(Var2, Var1, fill = value))+
+#  geom_tile(color = "white")+
+#  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+#    midpoint = 0, limit = c(-1,1), space = "Lab", 
+#    name="Pearson\nCorrelation") +
+#   theme_minimal()+  
+#   theme(axis.title.x=element_blank(),
+#         axis.text.x=element_blank(),
+#         axis.ticks.x=element_blank()) +
+#  coord_fixed()
+# 
+# dev.off()         
+# 
+# 
+# # creates a own color palette from red to green
+# #my_palette <- colorRampPalette(c("yellow", "orange", "red"))
+# my_palette <- colorRampPalette(c("red", "black", "green"))
+# 
+# 
+# # (optional) defines the color breaks manually for a "skewed" color transition
+# col_breaks = c(seq(-1,0,length=100), # for red
+# seq(0.01,0.8,length=100),  # for yellow
+# seq(0.81,1,length=100)) # for green
+# 
+# start.time <- Sys.time()
+# png("Data/yeast_heatmaps_PASS_corrlogcounts3.png",    # create PNG for the heat map        
+#   width = 5*300,        # 5 x 300 pixels
+#   height = 5*300,
+#   res = 300,            # 300 pixels per inch
+#   pointsize = 8)        # smaller font size
+# 
+# heatmap.2(melted_cormat[1:10000,],
+#   main = "Correlation of Counts", # heat map title
+#   margins =c(5,5),     # widens margins around plot
+#   col=my_palette,       # use on color palette defined earlier
+#   #breaks=col_breaks,    # enable color transition at specified limits
+#   trace="none",
+#   dendrogram="both",     # only draw a row dendrogram
+#   Rowv=T,
+#   Colv=T,
+#   symm=F,symkey=F,symbreaks=T, scale="none")            
+# 
+# 
+# dev.off()          
+# end.time <- Sys.time()
+# time.taken <- end.time - start.time
+# time.taken
+# 
+# 
+# # histogram - Pearson Method
+# png("Data/yeast_histograms_PASS_corrlogcounts.png",    # create PNG for the heat map        
+#   width = 5*300,        # 5 x 300 pixels
+#   height = 5*300,
+#   res = 300,            # 300 pixels per inch
+#   pointsize = 8)        # smaller font size
+# 
+# hist(melted_cormat, 
+#      main="Correlation of Counts (Pearson Method)", 
+#      xlab="Normalised RNA Seq Counts") 
+# 
+# dev.off()          
+# 
+# # histogram - Spearman Method
+# png("Data/yeast_histograms_PASS_corrlogcounts_spearman.png",       
+#   width = 5*300,        # 5 x 300 pixels
+#   height = 5*300,
+#   res = 300,            # 300 pixels per inch
+#   pointsize = 8)        # smaller font size
+# 
+# hist(corr_logcounts, 
+#      main="Correlation of Counts (Spearman Method)", 
+#      xlab="Normalised RNA Seq Counts") 
+# 
+# dev.off()          
+# 
+# 
+# # cut tree value vs Total Clusters – line diagram  
+# cuttree_totals_df <- as.data.frame(as.numeric(names(cuttree_values)))
+# m <- list()
+# for (i in 1:length(cuttree_values)){
+#   x <- cuttree_values[[i]][["Cut_value"]]
+#   m[[i]] <- x
+# }
+# cuttree_totals_df$CuttreeVal <- as.numeric(m)
+# colnames(cuttree_totals_df)[1] <- "ClTot"
+# 
+# png("Data/yeast_line_PASS_cuttree_vs_clTotal.png",       
+#   width = 5*300,        # 5 x 300 pixels
+#   height = 5*300,
+#   res = 300,            # 300 pixels per inch
+#   pointsize = 8)        # smaller font size
+# 
+# ggplot(cuttree_totals_df, aes(x=CuttreeVal, y=ClTot)) +
+#   geom_line() + ylab("Total Number of Clusters") + 
+#   xlab("Cuttree Values") +
+#   ggtitle("Cuttree Value vs Total Number of Clusters") +
+#   theme(plot.title = element_text(hjust = 0.5))
+# 
+# dev.off()   
+# 
+# 
+# # Total genes per cluster  – line diagram  
+# clTotals <- do.call(rbind.data.frame, sapply(cuttree_values, "[[", 3))
+# clTotals$ClTot <- as.factor(as.numeric(str_extract_all(rownames(clTotals), "^[:digit:]*(?=.)")))
+# clTotals$ClNum <- as.numeric(str_extract_all(rownames(clTotals), "(?=.)\\d+$"))
+# colnames(clTotals)[1] <- "GeneTot"
+# rownames(clTotals) <- c()
+# 
+# 
+# png("Data/yeast_violin_PASS_genesPerCl2.png",       
+#   width = 5*300,        # 5 x 300 pixels
+#   height = 5*300,
+#   res = 300,            # 300 pixels per inch
+#   pointsize = 8)        # smaller font size        
+# 
+# ggplot(clTotals, aes(x=ClNum, y=GeneTot, color=ClTot)) +
+#   geom_violin(trim=FALSE) + ylab("Total Number of Genes") + 
+#   xlab("Cluster Number") +
+#   ggtitle("Total Number of Genes per Cluster") +
+#   theme(plot.title = element_text(hjust = 0.5)) +
+#   theme(legend.position="none")
+# 
+# dev.off()   
 
 ```
 
@@ -800,81 +799,81 @@ dev.off()
 
 ```{r}
 
-no_ontologies1 <- setdiff(unique(rownames(agg)),unique(GO_table$GeneID))
-no_ontologies2 <- which(rowSums(GO_table[,2:length(GO_table)]) == 0)
-
-length(no_ontologies1)
-length(no_ontologies2) 
-
-
-summary_sweep2 <- data.frame()
-summary_sweep2 <- do.call(rbind.data.frame, lapply(kfold20_10, "[", 10))
-colnames(summary_sweep)[1] <- "k20_10.F1_Score"
-summary_sweep2$k20_40 <- do.call(rbind.data.frame, lapply(kfold20_40, function(x) {x[length(x)]}))
-summary_sweep$k20_80 <- do.call(rbind.data.frame, lapply(kfold20_80, function(x) {x[length(x)]}))
-summary_sweep$k50_10 <- do.call(rbind.data.frame, lapply(kfold50_10, function(x) {x[length(x)]}))
-summary_sweep$k50_40 <- do.call(rbind.data.frame, lapply(kfold50_40, function(x) {x[length(x)]}))
-summary_sweep$k50_80 <- do.call(rbind.data.frame, lapply(kfold50_80, function(x) {x[length(x)]}))
-summary_sweep$k200_10 <- do.call(rbind.data.frame, lapply(kfold200_10, function(x) {x[length(x)]}))
-summary_sweep$k200_40 <- do.call(rbind.data.frame, lapply(kfold200_40, function(x) {x[length(x)]}))
-summary_sweep$k200_80 <- do.call(rbind.data.frame, lapply(kfold200_80, function(x) {x[length(x)]}))
-summary_sweep$k300_10 <- do.call(rbind.data.frame, lapply(kfold300_10, function(x) {x[length(x)]}))
-summary_sweep$k300_40 <- do.call(rbind.data.frame, lapply(kfold300_40, function(x) {x[length(x)]}))
-summary_sweep$k300_80 <- do.call(rbind.data.frame, lapply(kfold300_80, function(x) {x[length(x)]}))
-summary_sweep$k500_10 <- do.call(rbind.data.frame, lapply(kfold500_10, function(x) {x[length(x)]}))
-summary_sweep$k500_40 <- do.call(rbind.data.frame, lapply(kfold500_40, function(x) {x[length(x)]}))
-summary_sweep$k500_80 <- do.call(rbind.data.frame, lapply(kfold500_80, function(x) {x[length(x)]}))
-
-Mean.F1_Score <- colMeans(summary_sweep)
-summary_sweep <- rbind(summary_sweep, Mean.F1_Score)
-rownames(summary_sweep)[rownames(summary_sweep) == "11"] <- "Mean.F1_Score"
-saveRDS(summary_sweep, "summary_sweep.rds")
-
-
-kfold_list <- list(k20_10=kfold20_10, k20_40=kfold20_40, k20_80=kfold20_80, 
-                k50_10=kfold50_10, k50_40=kfold50_40, k50_80=kfold50_80, 
-                k200_10=kfold200_10, k200_40=kfold200_40, k200_80=kfold200_80, 
-                k300_10=kfold300_10, k300_40=kfold300_40, k300_80=kfold300_80,
-                k500_10=kfold500_10, k500_40=kfold500_40, k500_80=kfold500_80)
-
-  
-mean_Csweep <- function(kfold_list, stat_type=10) {
-  mean_df <- data.frame()
-  
-  mean_df <- do.call(rbind.data.frame, lapply(kfold_list[[1]], "[", stat_type))
-  colnames(mean_df)[1] <- names(kfold_list[1])
-  
-  for (i in 2:length(kfold_list)){
-    col_name <- names(kfold_list[i])
-    mean_df[col_name] <- do.call(rbind.data.frame, lapply(kfold_list[[i]], "[", stat_type))
-  }
-  
-  Mean <- colMeans(mean_df)
-  mean_df <- rbind(mean_df, Mean)
-  rownames(mean_df)[rownames(mean_df) == "11"] <- "Mean"
-  
-  return(mean_df)
-}
-
-
-summary_Csweep <- function(kfold_list){
-  summary_df <- data.frame()
-  summary <- mean_Csweep(kfold_list, stat_type=6)
-  row_name <- names(kfold_list[[1]][[1]][6])
-  summary_df <- summary[11,]
-  rownames(summary_df)[rownames(summary_df) == "Mean"] <- row_name
-  
-  for (i in 7:length(kfold_list)){
-  summary <- mean_Csweep(kfold_list, stat_type=i)
-  row_name <- names(kfold_list[[1]][[1]][i])
-  summary_df[nrow(summary_df)+1,] <- summary[11,]
-  rownames(summary_df)[rownames(summary_df) == "Mean"] <- row_name
-  }
-  return(summary_df)
-}
-
-
-sum <- summary_Csweep(kfold_list)
+# no_ontologies1 <- setdiff(unique(rownames(agg)),unique(GO_table$GeneID))
+# no_ontologies2 <- which(rowSums(GO_table[,2:length(GO_table)]) == 0)
+# 
+# length(no_ontologies1)
+# length(no_ontologies2) 
+# 
+# 
+# summary_sweep2 <- data.frame()
+# summary_sweep2 <- do.call(rbind.data.frame, lapply(kfold20_10, "[", 10))
+# colnames(summary_sweep)[1] <- "k20_10.F1_Score"
+# summary_sweep2$k20_40 <- do.call(rbind.data.frame, lapply(kfold20_40, function(x) {x[length(x)]}))
+# summary_sweep$k20_80 <- do.call(rbind.data.frame, lapply(kfold20_80, function(x) {x[length(x)]}))
+# summary_sweep$k50_10 <- do.call(rbind.data.frame, lapply(kfold50_10, function(x) {x[length(x)]}))
+# summary_sweep$k50_40 <- do.call(rbind.data.frame, lapply(kfold50_40, function(x) {x[length(x)]}))
+# summary_sweep$k50_80 <- do.call(rbind.data.frame, lapply(kfold50_80, function(x) {x[length(x)]}))
+# summary_sweep$k200_10 <- do.call(rbind.data.frame, lapply(kfold200_10, function(x) {x[length(x)]}))
+# summary_sweep$k200_40 <- do.call(rbind.data.frame, lapply(kfold200_40, function(x) {x[length(x)]}))
+# summary_sweep$k200_80 <- do.call(rbind.data.frame, lapply(kfold200_80, function(x) {x[length(x)]}))
+# summary_sweep$k300_10 <- do.call(rbind.data.frame, lapply(kfold300_10, function(x) {x[length(x)]}))
+# summary_sweep$k300_40 <- do.call(rbind.data.frame, lapply(kfold300_40, function(x) {x[length(x)]}))
+# summary_sweep$k300_80 <- do.call(rbind.data.frame, lapply(kfold300_80, function(x) {x[length(x)]}))
+# summary_sweep$k500_10 <- do.call(rbind.data.frame, lapply(kfold500_10, function(x) {x[length(x)]}))
+# summary_sweep$k500_40 <- do.call(rbind.data.frame, lapply(kfold500_40, function(x) {x[length(x)]}))
+# summary_sweep$k500_80 <- do.call(rbind.data.frame, lapply(kfold500_80, function(x) {x[length(x)]}))
+# 
+# Mean.F1_Score <- colMeans(summary_sweep)
+# summary_sweep <- rbind(summary_sweep, Mean.F1_Score)
+# rownames(summary_sweep)[rownames(summary_sweep) == "11"] <- "Mean.F1_Score"
+# saveRDS(summary_sweep, "summary_sweep.rds")
+# 
+# 
+# kfold_list <- list(k20_10=kfold20_10, k20_40=kfold20_40, k20_80=kfold20_80, 
+#                 k50_10=kfold50_10, k50_40=kfold50_40, k50_80=kfold50_80, 
+#                 k200_10=kfold200_10, k200_40=kfold200_40, k200_80=kfold200_80, 
+#                 k300_10=kfold300_10, k300_40=kfold300_40, k300_80=kfold300_80,
+#                 k500_10=kfold500_10, k500_40=kfold500_40, k500_80=kfold500_80)
+# 
+#   
+# mean_Csweep <- function(kfold_list, stat_type=10) {
+#   mean_df <- data.frame()
+#   
+#   mean_df <- do.call(rbind.data.frame, lapply(kfold_list[[1]], "[", stat_type))
+#   colnames(mean_df)[1] <- names(kfold_list[1])
+#   
+#   for (i in 2:length(kfold_list)){
+#     col_name <- names(kfold_list[i])
+#     mean_df[col_name] <- do.call(rbind.data.frame, lapply(kfold_list[[i]], "[", stat_type))
+#   }
+#   
+#   Mean <- colMeans(mean_df)
+#   mean_df <- rbind(mean_df, Mean)
+#   rownames(mean_df)[rownames(mean_df) == "11"] <- "Mean"
+#   
+#   return(mean_df)
+# }
+# 
+# 
+# summary_Csweep <- function(kfold_list){
+#   summary_df <- data.frame()
+#   summary <- mean_Csweep(kfold_list, stat_type=6)
+#   row_name <- names(kfold_list[[1]][[1]][6])
+#   summary_df <- summary[11,]
+#   rownames(summary_df)[rownames(summary_df) == "Mean"] <- row_name
+#   
+#   for (i in 7:length(kfold_list)){
+#   summary <- mean_Csweep(kfold_list, stat_type=i)
+#   row_name <- names(kfold_list[[1]][[1]][i])
+#   summary_df[nrow(summary_df)+1,] <- summary[11,]
+#   rownames(summary_df)[rownames(summary_df) == "Mean"] <- row_name
+#   }
+#   return(summary_df)
+# }
+# 
+# 
+# sum <- summary_Csweep(kfold_list)
 
 
 
