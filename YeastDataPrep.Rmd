@@ -28,6 +28,12 @@ suppressPackageStartupMessages({
     library(edgeR)
 })
 
+# Special Installation for edgeR
+
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+# BiocManager::install("edgeR")
+
 source("functions.R")
 
 ```
@@ -265,7 +271,8 @@ saveRDS(hr, "hr_PASS.rds")
 # 1.605 was determined by trial and error to get 100 total 
 # clusters as a starting point of analysis
 
-mycl_length <- length(unique(cutree(hr, h=max(hr$height/1.605))))
+mycl <- cutree(hr, h=max(hr$height/1.605))
+mycl_length <- length(unique(mycl))
 
 # Check the number of clusters. Can be adjusted by changing the h=max denominator
 mycl_length
@@ -282,10 +289,6 @@ clusters$GeneID <- rownames(clusters)
 
 # Save clusters object as rds
 saveRDS(clusters, "clusters.rds")
-
-# Create a list of data frames for genes with different total clusters
-cluster_cuts <- cl_lengthCut(hr=hr, min=1.324, max=3.38, interval=0.05)
-saveRDS(cluster_cuts, "cluster_cuts.rds")
 
 # # Visualizations
 # if (!exists("P100")){
