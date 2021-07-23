@@ -45,6 +45,7 @@ file_GO <-"GO_table.rds"
 file_GO_allClusters <- "GOterms_allClusters.rds"
 file_corr_allClusters <- "corr_allClusters.rds"
 file_cuttree_totals <- "cuttree_totals.rds"
+file_hr <- "hr_PASS.rds"
 
 logcounts <- readRDS(file_logcounts_PASS)
 agg <- readRDS(file_agg)
@@ -53,6 +54,7 @@ GO_table <- readRDS(file_GO)
 GO_allClusters <-  readRDS(file_GO_allClusters)
 corr_allClusters <-  readRDS(file_corr_allClusters)
 cuttree_totals <- readRDS(file_cuttree_totals)
+hr <- readRDS(file_hr)
 
 ```
 

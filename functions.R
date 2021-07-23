@@ -135,7 +135,9 @@ cl_lengthCut <- function(hr, min, max, interval){
   cut <- seq(from = min, to = max, by = interval)
   
   for (i in cut){
-    mycl_length <- length(unique(cutree(hr, h=max(hr$height/i))))
+    
+    mycl <- cutree(hr, h=max(hr$height/i))
+    mycl_length <- length(unique(mycl))
     
     # Prepare Cluster data frame
     clusters <- as.data.frame(mycl)
@@ -294,6 +296,8 @@ impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
   
   for (i in 1:clust_total){
     
+    print(paste0("Imp", i))
+    
     GO_list <- rownames(cl_GOall[[i]])
     
     #If all the genes in the cluster have no GOs and the matrix is empty
@@ -407,6 +411,9 @@ stats_cl <- function(input_df, blinded_df, clust_total){
   stats_list <- list()
   
   for (i in 1:clust_total){
+    
+    print(paste0("scl", i))
+    
     input <- input_df[[i]][["Input"]]
     blind <- blinded_df[[i]][["Diff"]]
     
@@ -537,6 +544,8 @@ cross_val <- function(n, GO_annot, clusters,
   saveRDS(dict_folds, "dict_folds.rds")
   
   for (i in 1:n){
+    
+    print(i)
     which_fold <- i
     
     ind_blinded <- which(dict_folds$folds == which_fold)
@@ -559,6 +568,8 @@ cross_val <- function(n, GO_annot, clusters,
     stats[[paste0("Fold", i)]] <- stats_final
   }
   return(stats)
+  
+  browseURL('https://www.youtube.com/watch?v=QH2-TGUlwu4')
 }
 
 
@@ -593,4 +604,59 @@ mycl_opt <- function(hr, cut_min,
     }
   }
   return(mycl_cuts)
+}
+
+
+# This function's output is a dataframe of the averaged 
+# value of a specific measure of performance from kfold from stats_all()
+# Inputs:
+# kfold_kist = a daframe containing all the measures of performance 
+#             for each fold. See stats_all()
+# stat_type = a number indicating the measure of performance to be averaged
+#           from 1 to 10 in the ff order: Total Positive (TP), Total Negative
+#           (TN), False Positive (FP), False Negative (FN), Sensitivity (TPR),
+#           Specificity (TNR), Precision (PPV), and F1 Score (F1)
+
+mean_Csweep <- function(kfold_list, stat_type=10) {
+  mean_df <- data.frame()
+  
+  mean_df <- do.call(rbind.data.frame, lapply(kfold_list[[1]], "[", stat_type))
+  colnames(mean_df)[1] <- names(kfold_list[1])
+  
+  for (i in 2:length(kfold_list)){
+    col_name <- names(kfold_list[i])
+    mean_df[col_name] <- do.call(rbind.data.frame, lapply(kfold_list[[i]], "[", stat_type))
+  }
+  
+  Mean <- colMeans(mean_df)
+  mean_df <- rbind(mean_df, Mean)
+  rownames(mean_df)[rownames(mean_df) == "11"] <- "Mean"
+  
+  return(mean_df)
+}
+
+
+# This function's output is a dataframe of the averaged 
+# value of all measures of performances for all folds from stats_all()
+# Inputs:
+# kfold_kist = a daframe containing all the measures of performance 
+#             for each fold. See stats_all()
+
+
+summary_Csweep <- function(kfold_list){
+  summary_df <- data.frame()
+  summary <- mean_Csweep(kfold_list, stat_type=6)
+  row_name <- names(kfold_list[[1]][[1]][6])
+  summary_df <- summary[11,]
+  rownames(summary_df)[rownames(summary_df) == "Mean"] <- row_name
+  
+  stat_type_list <- c(7:10)
+  
+  for (i in stat_type_list){
+    summary <- mean_Csweep(kfold_list, stat_type=i)
+    row_name <- names(kfold_list[[1]][[1]][i])
+    summary_df[nrow(summary_df)+1,] <- summary[11,]
+    rownames(summary_df)[rownames(summary_df) == "Mean"] <- row_name
+  }
+  return(summary_df)
 }
