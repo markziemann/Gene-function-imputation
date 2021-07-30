@@ -26,6 +26,7 @@ suppressPackageStartupMessages({
     library(Polychrome)
     library(gplots)
     library(edgeR)
+    library(InterMineR)
 })
 
 # Special Installation for edgeR
@@ -290,30 +291,47 @@ clusters$GeneID <- rownames(clusters)
 # Save clusters object as rds
 saveRDS(clusters, "clusters.rds")
 
-# # Visualizations
-# if (!exists("P100")){
-#   P100 <- createPalette(100,  c("#ff0000", "#00ff00", "#0000ff"))}
-# 
-# clusterCols <- P100[1:mycl_length]
-# myClusterSideBar <- clusterCols[mycl]
-# colfunc <- colorRampPalette(c("blue", "white", "red"))
-# if (!file.exists("Data/scerevisiae_pass.txt")){
-#   write.table(mycl,file="Data/scerevisiae_pass.txt",quote=F,sep="\t")}
-# 
-# # create a 5 x 5 inch png image
-# png("Data/yeast_heatmaps_PASS_normalization3.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)          
-# 
-# # create the heatmap
-# heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
-#           dendrogram="both", scale="column", col = colfunc(25), trace="none", 
-#           RowSideColors= myClusterSideBar, margins = c(5,5))
-# 
-# dev.off()
-# 
-# # create the heatmap
-# heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
-#           dendrogram="both", scale="column", col = colfunc(25), trace="none",
-#           RowSideColors= myClusterSideBar, margins = c(5,5))
+# Visualizations
+if (!exists("P100")){
+  P100 <- createPalette(100,  c("#ff0000", "#00ff00", "#0000ff"))}
+
+clusterCols <- P100[1:mycl_length]
+myClusterSideBar <- clusterCols[mycl]
+colfunc <- colorRampPalette(c("blue", "white", "red"))
+if (!file.exists("Data/scerevisiae_pass.txt")){
+  write.table(mycl,file="Data/scerevisiae_pass.txt",quote=F,sep="\t")}
+
+
+start.time <- Sys.time()
+# create a 5 x 5 inch png image
+png("Data/yeast_heatmaps_PASS_normalization_saleNone.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+
+# create the heatmap
+heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
+          dendrogram="both", scale="none", col = colfunc(25), trace="none",
+          RowSideColors= myClusterSideBar, margins = c(5,5))
+
+dev.off()
+
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+
+
+start.time <- Sys.time()
+# create a 5 x 5 inch png image
+png("Data/yeast_heatmaps_PASS_normalization_saleRow.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+
+# create the heatmap
+heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
+          dendrogram="both", scale="row", col = colfunc(25), trace="none",
+          RowSideColors= myClusterSideBar, margins = c(5,5))
+
+dev.off()
+
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
 
 ```
 
@@ -371,10 +389,64 @@ dim(diff_GO.Count2)
 # Save the new GO table
 saveRDS(GO_table, "GO_table.rds")
 
+
 ```
 
+### 8. Get Genes with no annotations
 
-### 8. Data preparation functions
+```{r echo=TRUE}
+# Use the YeastMine plugin for R from yeastgenome.org to get the list of genes
+# with uncharacterised ORF
+
+im <-  initInterMine(listMines()["YeastMine"])
+
+q_unchar <- setQuery(
+select = c("Gene.secondaryIdentifier"),
+where = setConstraints(paths = c("Gene"),
+operators = c("IN"),
+values = list("Uncharacterized_ORFs")
+))
+
+q_dubious <- setQuery(
+select = c("Gene.secondaryIdentifier"),
+where = setConstraints(paths = c("Gene"),
+operators = c("IN"),
+values = list("Dubious_ORFs")
+))
+
+q_verified <- setQuery(
+select = c("Gene.secondaryIdentifier"),
+where = setConstraints(paths = c("Gene"),
+operators = c("IN"),
+values = list("Verified_ORFs")
+))
+
+unchar_ORFs <- runQuery(im, q_unchar)
+dubious_ORFs <- runQuery(im, q_dubious)
+verified_ORFs <- runQuery(im, q_verified)
+
+unchar_ORFs_list <- as.list(unchar_ORFs$Gene.secondaryIdentifier)
+dubious_ORFs_list <- as.list(dubious_ORFs$Gene.secondaryIdentifier)
+verified_ORFs_list <- as.list(verified_ORFs$Gene.secondaryIdentifier)
+
+a <- agg[which(rownames(agg) %in% unchar_ORFs_list),] #721 vs 722 in the orig
+b <- agg[which(rownames(agg) %in% dubious_ORFs_list),] #688 
+c <- agg[which(rownames(agg) %in% verified_ORFs_list),] #5190 vs 5195 in the orig
+
+# 5190 + 688 + 721 = 6599 vs 6605 total; 6 missing IDs
+# missing IDs
+
+e <- setdiff(unchar_ORFs_list, rownames(a))
+f <- setdiff(verified_ORFs_list, rownames(c))
+
+# verify with the GO terms
+g <- scerevisiae_GO_matrix_wide[which(scerevisiae_GO_matrix_wide$GeneID %in% verified_ORFs_list),]
+
+h <- setdiff(verified_ORFs_list, g$GeneID) # STA1 missing in GO table
+
+```
+
+### 9. Data preparation functions
 
 ```{r echo=TRUE}
 
