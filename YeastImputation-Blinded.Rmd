@@ -27,6 +27,7 @@ suppressPackageStartupMessages({
     library(caret)
     library(ggplot2)
     library(reshape2)
+    library(tools)
 })
 
 source("functions.R")
@@ -527,6 +528,66 @@ time.taken <- end.time - start.time
 time.taken
 
 
+# ---------------------- for 1000 clusters (run inputs)
+cluster1000 <- cuttree_values[["1000"]][["GeneID_assignments"]]
+corr_allClusters1000 <- corr_per_clust(logcounts, cluster1000, 1000)
+GOterms_perCl1000 <- GO_per_cl(GO_table, cluster1000, 1000)
+GO_list_perCl1000 <- GO_list_perClBlind(GOterms_perCl1000, 1000)
+
+GO_blindedClusters1000 <- GO_per_cl_blinded(GO_blinded, 
+                        cluster1000, GO_list_perCl1000, 1000)
+
+# stats for thresholds 
+wGO_allClusters1000_10 <- impute(cl_GOall = GOterms_perCl1000, 
+                        corr_clAll = corr_allClusters1000,
+                        clust_total = 1000, thresh = 0.1)
+kfold1000_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster1000,
+                       GO_list_perCl=GO_list_perCl1000, 
+                       corr_clAll=corr_allClusters1000,
+                       wGO_allClusters=wGO_allClusters1000_10,
+                       clust_total=1000, thresh=0.1)
+saveRDS(kfold1000_10, "kfold1000_10.rds")
+
+
+wGO_allClusters1000_40 <- impute(cl_GOall = GOterms_perCl1000, 
+                        corr_clAll = corr_allClusters1000,
+                        clust_total = 1000, thresh = 0.4)
+kfold1000_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster1000,
+                       GO_list_perCl=GO_list_perCl1000, 
+                       corr_clAll=corr_allClusters1000,
+                       wGO_allClusters=wGO_allClusters1000_40,
+                       clust_total=1000, thresh=0.4)
+saveRDS(kfold1000_40, "kfold1000_40.rds")
+
+start.time <- Sys.time()
+wGO_allClusters1000_80 <- impute(cl_GOall = GOterms_perCl1000, 
+                        corr_clAll = corr_allClusters1000,
+                        clust_total = 1000, thresh = 0.8)
+
+kfold1000_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster1000,
+                       GO_list_perCl=GO_list_perCl1000, 
+                       corr_clAll=corr_allClusters1000,
+                       wGO_allClusters=wGO_allClusters1000_80,
+                       clust_total=1000, thresh=0.8)
+saveRDS(kfold1000_80, "kfold1000_80.rds")
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+
+kfold1000_90 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster1000,
+                       GO_list_perCl=GO_list_perCl1000, 
+                       corr_clAll=corr_allClusters1000,
+                       wGO_allClusters=wGO_allClusters1000_80,
+                       clust_total=1000, thresh=0.9)
+saveRDS(kfold1000_80, "kfold1000_90.rds")
+
+kfold1000_100 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster1000,
+                       GO_list_perCl=GO_list_perCl1000, 
+                       corr_clAll=corr_allClusters1000,
+                       wGO_allClusters=wGO_allClusters1000_80,
+                       clust_total=1000, thresh=1)
+saveRDS(kfold1000_80, "kfold1000_100.rds")
+
 
 ```
 
@@ -688,6 +749,19 @@ dev.off()
 
 ```{r}
 
+# Get the list of all the kfold rds files
+files = list.files(pattern = '^kfold.')
+# Get the list of all the kfold rds files sans extension
+files2 = file_path_sans_ext(list.files(pattern ='^kfold.'))
+# put all the dataframes in one list
+dat_list = lapply(files, function (x) readRDS(x))
+# put the names for each dataframe in the list
+names(dat_list) <- files2
+
+# more simplified version of the code above but the name of the list has the extension
+dat_list2 = sapply(files,function (x) readRDS(x), simplify = FALSE, USE.NAMES = TRUE)
+
+
 no_ontologies1 <- setdiff(unique(rownames(agg)),unique(GO_table$GeneID))
 no_ontologies2 <- which(rowSums(GO_table[,2:length(GO_table)]) == 0)
 
@@ -695,74 +769,21 @@ length(no_ontologies1)
 length(no_ontologies2)
 
 
-summary_sweep2 <- data.frame()
-summary_sweep2 <- do.call(rbind.data.frame, lapply(kfold20_10, "[", 10))
-colnames(summary_sweep)[1] <- "k20_10.F1_Score"
-summary_sweep2$k20_40 <- do.call(rbind.data.frame, lapply(kfold20_40, function(x) {x[length(x)]}))
-summary_sweep$k20_80 <- do.call(rbind.data.frame, lapply(kfold20_80, function(x) {x[length(x)]}))
-summary_sweep$k50_10 <- do.call(rbind.data.frame, lapply(kfold50_10, function(x) {x[length(x)]}))
-summary_sweep$k50_40 <- do.call(rbind.data.frame, lapply(kfold50_40, function(x) {x[length(x)]}))
-summary_sweep$k50_80 <- do.call(rbind.data.frame, lapply(kfold50_80, function(x) {x[length(x)]}))
-summary_sweep$k200_10 <- do.call(rbind.data.frame, lapply(kfold200_10, function(x) {x[length(x)]}))
-summary_sweep$k200_40 <- do.call(rbind.data.frame, lapply(kfold200_40, function(x) {x[length(x)]}))
-summary_sweep$k200_80 <- do.call(rbind.data.frame, lapply(kfold200_80, function(x) {x[length(x)]}))
-summary_sweep$k300_10 <- do.call(rbind.data.frame, lapply(kfold300_10, function(x) {x[length(x)]}))
-summary_sweep$k300_40 <- do.call(rbind.data.frame, lapply(kfold300_40, function(x) {x[length(x)]}))
-summary_sweep$k300_80 <- do.call(rbind.data.frame, lapply(kfold300_80, function(x) {x[length(x)]}))
-summary_sweep$k500_10 <- do.call(rbind.data.frame, lapply(kfold500_10, function(x) {x[length(x)]}))
-summary_sweep$k500_40 <- do.call(rbind.data.frame, lapply(kfold500_40, function(x) {x[length(x)]}))
-summary_sweep$k500_80 <- do.call(rbind.data.frame, lapply(kfold500_80, function(x) {x[length(x)]}))
+summary_F1 <- sapply(dat_list, function(x){
+  sapply(x, function(x) {x[length(x)]})
+}, simplify = "array", USE.NAMES = TRUE)
 
-Mean.F1_Score <- colMeans(summary_sweep)
-summary_sweep <- rbind(summary_sweep, Mean.F1_Score)
-rownames(summary_sweep)[rownames(summary_sweep) == "11"] <- "Mean.F1_Score"
-saveRDS(summary_sweep, "summary_sweep.rds")
+summary_F1_list <- as.data.frame(summary_F1)
+summary_F1_df <- t(do.call(rbind, lapply(summary_F1_list, data.frame, stringsAsFactors=FALSE)))
 
 
-kfold_list <- list(k20_10=kfold20_10, k20_40=kfold20_40, k20_80=kfold20_80,
-                k50_10=kfold50_10, k50_40=kfold50_40, k50_80=kfold50_80,
-                k200_10=kfold200_10, k200_40=kfold200_40, k200_80=kfold200_80,
-                k300_10=kfold300_10, k300_40=kfold300_40, k300_80=kfold300_80,
-                k500_10=kfold500_10, k500_40=kfold500_40, k500_80=kfold500_80)
+Mean.F1_Score <- colMeans(summary_F1_df)
+summary_F1_df <- rbind(summary_F1_df, Mean.F1_Score)
+rownames(summary_F1_df)[rownames(summary_F1_df) == "11"] <- "Mean.F1_Score"
+saveRDS(summary_F1_df, "summary_F1_df.rds")
 
 
-mean_Csweep <- function(kfold_list, stat_type=10) {
-  mean_df <- data.frame()
-
-  mean_df <- do.call(rbind.data.frame, lapply(kfold_list[[1]], "[", stat_type))
-  colnames(mean_df)[1] <- names(kfold_list[1])
-
-  for (i in 2:length(kfold_list)){
-    col_name <- names(kfold_list[i])
-    mean_df[col_name] <- do.call(rbind.data.frame, lapply(kfold_list[[i]], "[", stat_type))
-  }
-
-  Mean <- colMeans(mean_df)
-  mean_df <- rbind(mean_df, Mean)
-  rownames(mean_df)[rownames(mean_df) == "11"] <- "Mean"
-
-  return(mean_df)
-}
-
-
-summary_Csweep <- function(kfold_list){
-  summary_df <- data.frame()
-  summary <- mean_Csweep(kfold_list, stat_type=6)
-  row_name <- names(kfold_list[[1]][[1]][6])
-  summary_df <- summary[11,]
-  rownames(summary_df)[rownames(summary_df) == "Mean"] <- row_name
-
-  for (i in 7:length(kfold_list)){
-  summary <- mean_Csweep(kfold_list, stat_type=i)
-  row_name <- names(kfold_list[[1]][[1]][i])
-  summary_df[nrow(summary_df)+1,] <- summary[11,]
-  rownames(summary_df)[rownames(summary_df) == "Mean"] <- row_name
-  }
-  return(summary_df)
-}
-
-
-sum <- summary_Csweep(kfold_list)
+summary_all <- summary_Csweep(dat_list)
 
 
 
