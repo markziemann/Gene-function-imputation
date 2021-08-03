@@ -129,7 +129,7 @@ scerevisiae_pass_wide[1:10,1:6]
 
 ```
 
-### 5. Aggregate the SRR run data to SRX experiment (with PASS only databases)
+### 5. Aggregate multiple runs, if any, (SRR) to its corresponding experiment (SRX) with PASS only databases
 
 ```{r SRR to SRX Aggregation, echo=TRUE}
 
@@ -147,24 +147,6 @@ yeast_metadata_pass <- yeast_metadata[yeast_metadata$SRR_accession %in% databse_
 # Assign column 1 as rownames 
 rownames(yeast_metadata_pass) <- yeast_metadata_pass[,1]
 yeast_metadata_pass <- yeast_metadata_pass[,-1]
-
-# Sequencing Run aggregate function
-srx_agg <- function(x,counts="GeneCounts") {
-    IDX=which(names(x) %in% "GeneCounts")
-    mds<-x$MetadataSummary
-    n=nrow(x[[IDX]])
-    SRX_dat <- vapply(X=unique(mds$SRX_accession) ,function(srx) {
-        srrs<-rownames(mds)[which(mds$SRX_accession %in% srx)]
-        if (length(srrs)>1) {
-            rowSums(x[[IDX]][,srrs])
-        } else {
-            x[[IDX]][,srrs]
-        }
-    } , numeric(n))
-    rownames(SRX_dat) <- rownames(x[[IDX]])
-    colnames(SRX_dat) <- unique(mds$SRX_accession)
-    SRX_dat
-}
 
 # Put the filtered yeast GeneCount data and the filtered metadata dataframes into a list
 yeast_count_metadata <- list(GeneCounts = scerevisiae_pass_wide, MetadataSummary = yeast_metadata_pass)
@@ -209,7 +191,7 @@ thresh <- myCPM > 0.6
 # check if there are zero values. Result should be FALSE.
 all(apply(apply(myCPM, 2, function(x) x==0), 2, any))
 
-# Keep genes that have at least 2 TRUEs in each row of thresh
+# Keep genes that have at least 2 TRUEs in each row
 keep <- rowSums(thresh) >= 2
 
 # Subset the rows of data to keep the more highly expressed genes
@@ -279,7 +261,7 @@ mycl_length <- length(unique(mycl))
 mycl_length
 
 # Save the clusters value 
-saveRDS(mycl, "mycl_PASS.rds")
+saveRDS(mycl, "mycl_PASS_PandC.rds")
 
 # Prepare Cluster data frame
 clusters <- as.data.frame(mycl)
@@ -289,7 +271,7 @@ colnames(clusters) <- "ClusterNumber"
 clusters$GeneID <- rownames(clusters)
 
 # Save clusters object as rds
-saveRDS(clusters, "clusters.rds")
+saveRDS(clusters, "clusters_PandC.rds")
 
 # Visualizations
 if (!exists("P100")){
