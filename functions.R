@@ -271,8 +271,9 @@ wcorr_cluster <- function(gene_list, corr_cl, cl_GO){
     weighted_go[is.na(weighted_go)] <- 0
     corr_colsum <- sum(weighted_go[,1])
     weighted_go <- weighted_go[,1]*weighted_go[,2:ncol(weighted_go)]
-    normalized_weighted_go <- colSums(weighted_go)/corr_colsum
-    wcorr_result[[gene]] <- normalized_weighted_go
+    #normalized_weighted_go <- colSums(weighted_go)/corr_colsum
+    weighted_go_ave <- colMeans(weighted_go) 
+    wcorr_result[[gene]] <- weighted_go_ave
   }
   setNames(wcorr_result, paste0(gene))
   return(wcorr_result)
@@ -295,8 +296,6 @@ impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
   wGO_list <- list()
   
   for (i in 1:clust_total){
-    
-    print(paste0("Imp", i))
     
     GO_list <- rownames(cl_GOall[[i]])
     
@@ -566,10 +565,10 @@ cross_val <- function(n, GO_annot, clusters,
     stats_final <- stats_all(stats_perCl)
     
     stats[[paste0("Fold", i)]] <- stats_final
+    stats[["Index"]] <- dict_folds
   }
   return(stats)
   
-  browseURL('https://www.youtube.com/watch?v=QH2-TGUlwu4')
 }
 
 
@@ -659,4 +658,45 @@ summary_Csweep <- function(kfold_list){
     rownames(summary_df)[rownames(summary_df) == "Mean"] <- row_name
   }
   return(summary_df)
+}
+
+
+# NEEDS EDITING
+#This function outputs a nested list of mean performance values 
+# for a series of thresholds determined by a set interval
+# Input: 
+# interval - int; the interval from 0 to 1 used to generate a sequence
+# of values that will serve as a threshold
+
+cross_val_thresh <- function(interval){
+  
+  kfold_gobal <- list()
+  
+  thresh <- seq(from = 0, to = 1, by = interval)
+  
+  for (i in thresh){
+    
+    kfold <- cross_val(n=10, GO_annot=GO_table, clusters=cluster20,
+                       GO_list_perCl=GOterms_perCl, 
+                       corr_clAll=corr_allClusters,
+                       wGO_allClusters=wGO_allClusters,
+                       clust_total=20, thresh= i)
+    
+    kfold_df <- as.data.frame(do.call(rbind, kfold))
+    
+    Sensitivity <- mean(unlist(kfold_df$Sensitivity))
+    Specificity <- mean(unlist(kfold_df$Specificity))
+    Precision <- mean(unlist(kfold_df$Precision))
+    Accuracy <- mean(unlist(kfold_df$Accuracy))
+    F1_Score <- mean(unlist(kfold_df$`F1 Score`))
+    
+    
+    kfold_gobal[[paste0(i)]][["DF"]] <- kfold_df
+    kfold_gobal[[paste0(i)]][["Sensitivity"]] <- Sensitivity
+    kfold_gobal[[paste0(i)]][["Specificity"]] <- Specificity
+    kfold_gobal[[paste0(i)]][["Precision"]] <- Precision
+    kfold_gobal[[paste0(i)]][["Accuracy"]] <- Accuracy
+    kfold_gobal[[paste0(i)]][["F1_Score"]] <- F1_Score
+  }
+  return(kfold_gobal)
 }
