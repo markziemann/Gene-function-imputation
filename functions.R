@@ -565,8 +565,8 @@ cross_val <- function(n, GO_annot, clusters,
     stats_final <- stats_all(stats_perCl)
     
     stats[[paste0("Fold", i)]] <- stats_final
-    stats[["Index"]] <- dict_folds
   }
+  stats[["Index_folds"]] <- dict_folds
   return(stats)
   
 }
