@@ -38,8 +38,7 @@ source("functions.R")
 ### Load Pre-requisite RDS files 
 ```{r echo=TRUE}
 file_logcounts_PASS <- "logcounts_PASS.rds"
-file_agg <- "agg.rds"
-file_clusters <- "clusters.rds"
+file_clusters_PandC <- "clusters_PandC.rds"
 file_GO <-"GO_table.rds"
 file_GO_allClusters <- "GOterms_allClusters.rds"
 file_corr_allClusters <- "corr_allClusters.rds"
@@ -48,8 +47,7 @@ file_GOterms_perCl <- "GOterms_perCl.rds"
 file_cuttree_values <- "cuttree_values.rds"
 
 logcounts <- readRDS(file_logcounts_PASS)
-agg <- readRDS(file_agg)
-clusters <- readRDS(file_clusters)
+clusters <- readRDS(file_clusters_PandC)
 GO_table <- readRDS(file_GO)
 GO_allClusters <-  readRDS(file_GO_allClusters)
 corr_allClusters <-  readRDS(file_corr_allClusters)
@@ -129,7 +127,7 @@ wGO_blinded20 <- impute(cl_GOall=GOterms_perCl20,
 wGO_allClusters20_10 <- impute(cl_GOall = GOterms_perCl20, 
                         corr_clAll = corr_allClusters20,
                         clust_total = 20, thresh = 0.1)
-PandC20_10_test <- cross_val(n=10, GO_annot=GO_table, clusters=cluster20,
+PandC20_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster20,
                        GO_list_perCl=GO_list_perCl20, 
                        corr_clAll=corr_allClusters20,
                        wGO_allClusters=wGO_allClusters20_10,
@@ -498,11 +496,7 @@ files_names <- file_path_sans_ext(list.files(pattern ='^PandC.'))
 # Put all the dataframes in one list
 dat_list <- sapply(files,function (x) readRDS(x), simplify = FALSE, USE.NAMES = TRUE)
 # Change the names to get rid of the extension
-names(dat_list2) <- files_names
-
-# Number of gene IDs with no GO IDs
-no_ontologies1 <- setdiff(unique(rownames(agg)),unique(GO_table$GeneID))
-length(no_ontologies1)
+names(dat_list) <- files_names
 
 # Put all the F1 socres of each fold in one array
 F1_PandC <- sapply(dat_list, function(x){

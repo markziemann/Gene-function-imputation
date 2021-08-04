@@ -248,7 +248,7 @@ logcounts <- readRDS(filename)
 set.seed(42)
 cl <-as.dist(1-cor(t(logcounts), method="spearman"))
 hr <- hclust(cl , method="complete")
-saveRDS(hr, "hr_PASS.rds")
+saveRDS(hr, "hr_PASS_PandC.rds")
 
 # optimizing the cluster size
 # 1.605 was determined by trial and error to get 100 total 
@@ -273,47 +273,47 @@ clusters$GeneID <- rownames(clusters)
 # Save clusters object as rds
 saveRDS(clusters, "clusters_PandC.rds")
 
-# Visualizations
-if (!exists("P100")){
-  P100 <- createPalette(100,  c("#ff0000", "#00ff00", "#0000ff"))}
-
-clusterCols <- P100[1:mycl_length]
-myClusterSideBar <- clusterCols[mycl]
-colfunc <- colorRampPalette(c("blue", "white", "red"))
-if (!file.exists("Data/scerevisiae_pass.txt")){
-  write.table(mycl,file="Data/scerevisiae_pass.txt",quote=F,sep="\t")}
-
-
-start.time <- Sys.time()
-# create a 5 x 5 inch png image
-png("Data/yeast_heatmaps_PASS_normalization_saleNone.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
-
-# create the heatmap
-heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
-          dendrogram="both", scale="none", col = colfunc(25), trace="none",
-          RowSideColors= myClusterSideBar, margins = c(5,5))
-
-dev.off()
-
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-
-
-start.time <- Sys.time()
-# create a 5 x 5 inch png image
-png("Data/yeast_heatmaps_PASS_normalization_saleRow.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
-
-# create the heatmap
-heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
-          dendrogram="both", scale="row", col = colfunc(25), trace="none",
-          RowSideColors= myClusterSideBar, margins = c(5,5))
-
-dev.off()
-
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
+# # Visualizations
+# if (!exists("P100")){
+#   P100 <- createPalette(100,  c("#ff0000", "#00ff00", "#0000ff"))}
+# 
+# clusterCols <- P100[1:mycl_length]
+# myClusterSideBar <- clusterCols[mycl]
+# colfunc <- colorRampPalette(c("blue", "white", "red"))
+# if (!file.exists("Data/scerevisiae_pass.txt")){
+#   write.table(mycl,file="Data/scerevisiae_pass.txt",quote=F,sep="\t")}
+# 
+# 
+# start.time <- Sys.time()
+# # create a 5 x 5 inch png image
+# png("Data/yeast_heatmaps_PASS_normalization_saleNone.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+# 
+# # create the heatmap
+# heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
+#           dendrogram="both", scale="none", col = colfunc(25), trace="none",
+#           RowSideColors= myClusterSideBar, margins = c(5,5))
+# 
+# dev.off()
+# 
+# end.time <- Sys.time()
+# time.taken <- end.time - start.time
+# time.taken
+# 
+# 
+# start.time <- Sys.time()
+# # create a 5 x 5 inch png image
+# png("Data/yeast_heatmaps_PASS_normalization_saleRow.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+# 
+# # create the heatmap
+# heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
+#           dendrogram="both", scale="row", col = colfunc(25), trace="none",
+#           RowSideColors= myClusterSideBar, margins = c(5,5))
+# 
+# dev.off()
+# 
+# end.time <- Sys.time()
+# time.taken <- end.time - start.time
+# time.taken
 
 ```
 

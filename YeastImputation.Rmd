@@ -45,16 +45,16 @@ file_GO <-"GO_table.rds"
 file_GO_allClusters <- "GOterms_allClusters.rds"
 file_corr_allClusters <- "corr_allClusters.rds"
 file_cuttree_totals <- "cuttree_totals.rds"
-file_hr <- "hr_PASS.rds"
+file_hr_PandC <- "hr_PASS_PandC.rds"
 
 logcounts <- readRDS(file_logcounts_PASS)
 agg <- readRDS(file_agg)
-clusters_PandC <- readRDS(file_clusters_PandC)
+clusters <- readRDS(file_clusters_PandC)
 GO_table <- readRDS(file_GO)
 GO_allClusters <-  readRDS(file_GO_allClusters)
 corr_allClusters <-  readRDS(file_corr_allClusters)
 cuttree_totals <- readRDS(file_cuttree_totals)
-hr <- readRDS(file_hr)
+hr <- readRDS(file_hr_PandC)
 
 ```
 
@@ -114,6 +114,7 @@ which(!colnames(imputed_Clust1_df) == colnames(input_mat))
 
 # Comparison between input df and resultant df
 Clust1_subtract <- imputed_Clust1_df - input_mat
+Clust1_subtract[Clust1_subtract<0] <- 1
 which(Clust1_subtract == -1)
 
 ```
@@ -180,7 +181,9 @@ saveRDS(GOterms_perCl, "GOterms_perCl.rds")
 cuttree_values <- cl_lengthCut(hr=hr, min=1.297, max=3.378, interval=0.001)
 saveRDS(cuttree_values, "cuttree_values.rds")
 
-
+# Number of gene IDs with no GO IDs
+no_ontologies1 <- setdiff(unique(rownames(agg)),unique(GO_table$GeneID))
+length(no_ontologies1)
 ```
 
 
