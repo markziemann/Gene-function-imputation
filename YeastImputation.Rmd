@@ -40,25 +40,25 @@ source("functions.R")
 
 file_logcounts_PASS <- "logcounts_PASS.rds"
 file_agg <- "agg.rds"
-file_clusters_PandC <- "clusters_PandC.rds"
+file_clusters_SandC <- "clusters_SandC.rds"
 file_GO <-"GO_table.rds"
 file_GO_allClusters <- "GOterms_allClusters.rds"
 file_corr_allClusters <- "corr_allClusters.rds"
 file_cuttree_totals <- "cuttree_totals.rds"
-file_hr_PandC <- "hr_PASS_PandC.rds"
+file_hr_SandC <- "hr_PASS_SandC.rds"
 
 logcounts <- readRDS(file_logcounts_PASS)
 agg <- readRDS(file_agg)
-clusters <- readRDS(file_clusters_PandC)
+clusters <- readRDS(file_clusters_SandC)
 GO_table <- readRDS(file_GO)
 GO_allClusters <-  readRDS(file_GO_allClusters)
 corr_allClusters <-  readRDS(file_corr_allClusters)
 cuttree_totals <- readRDS(file_cuttree_totals)
-hr <- readRDS(file_hr_PandC)
+hr <- readRDS(file_hr_SandC)
 
 ```
 
-### 2. Cluster Analysis
+### 1. Cluster Analysis
 
 ```{r, clustering}
 
@@ -119,7 +119,7 @@ which(Clust1_subtract == -1)
 
 ```
 
-### 3. Visualizations
+### 2. Visualizations
 
 ```{r echo=TRUE, fig.width=8, fig.height=8}
 
@@ -144,7 +144,7 @@ heatmap.2(as.matrix(Clust1_subtract), main="S.cerevisiae Cluster 1 GO Terms vs I
 
 ```
 
-### 4. Imputation functions
+### 3. Imputation functions
 
 ```{r echo=TRUE, fig.width=8, fig.height=8}
 
@@ -157,10 +157,6 @@ wGO_allClusters <- impute(cl_GOall = GO_allClusters,
 saveRDS(wGO_allClusters, "wGO_allClusters.rds")
 
 
-# Vizualizations 
-wGO_viz <- impute_viz(2, wGO_allClusters)
-
-
 # Get the list of GO terms per cluster from the original db (before blinding) to use as a reference for filtering the relevant GO terms per cluster. This also makes sure that dimensions (number of columns) in all of the trials are equal.
 
 GOterms_perCl <- GO_list_perCl(wGO_allClusters, 100)
@@ -170,7 +166,7 @@ GOterms_perCl <- GO_list_perCl(wGO_allClusters, 100)
 saveRDS(GOterms_perCl, "GOterms_perCl.rds")
 ```
 
-### 5. Optimization of parameters
+### 4. Optimization of parameters
 
 ```{r}
 

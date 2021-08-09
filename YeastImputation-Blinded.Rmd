@@ -38,20 +38,16 @@ source("functions.R")
 ### Load Pre-requisite RDS files 
 ```{r echo=TRUE}
 file_logcounts_PASS <- "logcounts_PASS.rds"
-file_clusters_PandC <- "clusters_PandC.rds"
+file_clusters_SandC <- "clusters_SandC.rds"
 file_GO <-"GO_table.rds"
-file_GO_allClusters <- "GOterms_allClusters.rds"
 file_corr_allClusters <- "corr_allClusters.rds"
-file_wGO_allClusters <- "wGO_allClusters.rds"
 file_GOterms_perCl <- "GOterms_perCl.rds"
 file_cuttree_values <- "cuttree_values.rds"
 
 logcounts <- readRDS(file_logcounts_PASS)
-clusters <- readRDS(file_clusters_PandC)
+clusters <- readRDS(file_clusters_SandC)
 GO_table <- readRDS(file_GO)
-GO_allClusters <-  readRDS(file_GO_allClusters)
 corr_allClusters <-  readRDS(file_corr_allClusters)
-wGO_allClusters <- readRDS(file_wGO_allClusters)
 GOterms_perCl <- readRDS(file_GOterms_perCl)
 cuttree_values <- readRDS(file_cuttree_values) 
 ```
@@ -80,7 +76,7 @@ GO_blinded[ind_blinded, 2:ncol(GO_blinded)] = 0
 
 ```
 
-### 2a. Impute using Pearson method to measure the distance matrix and complete as linkage method during the clustering process (This algorithm will be called PandC)
+### 2a. Impute using Spearman method to measure the distance matrix and complete as linkage method during the clustering process (This algorithm will be called SandC)
 
 ```{r }
 
@@ -103,7 +99,7 @@ saveRDS(wGO_blinded, "wGO_blinded.rds")
 </br>
 
 
-### 2b. Coarse Sweep for Pearson + complete linkage (PandC)
+### 2b. Coarse Sweep for Spearman + complete linkage (SandC)
 The following code will perform a K-fold validation for the imputation process which uses Pearson method to measure the distance matrix and complete as linkage method during the clustering process. 
 
 ```{r}
@@ -111,58 +107,58 @@ The following code will perform a K-fold validation for the imputation process w
 
 # for 20 clusters (run inputs)
 # ---------------------- 
-cluster20 <- cuttree_values[["20"]][["GeneID_assignments"]]
-corr_allClusters20 <- corr_per_clust(logcounts, cluster20, 20)
-GOterms_perCl20 <- GO_per_cl(GO_table, cluster20, 20)
-GO_list_perCl20 <- GO_list_perClBlind(GOterms_perCl20, 20)
-
-GO_blindedClusters20 <- GO_per_cl_blinded(GO_blinded, 
-                        cluster20, GO_list_perCl20, 20)
-
-wGO_blinded20 <- impute(cl_GOall=GOterms_perCl20, 
-                        corr_clAll=corr_allClusters20, 
-                        clust_total=20, thresh=0)
-
-# stats for thresholds 
-wGO_allClusters20_10 <- impute(cl_GOall = GOterms_perCl20, 
-                        corr_clAll = corr_allClusters20,
-                        clust_total = 20, thresh = 0.1)
-PandC20_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster20,
-                       GO_list_perCl=GO_list_perCl20, 
-                       corr_clAll=corr_allClusters20,
-                       wGO_allClusters=wGO_allClusters20_10,
-                       clust_total=20, thresh=0.1)
-saveRDS(PandC20_10, "PandC20_10.rds")
-
-
-
-wGO_allClusters20_40 <- impute(cl_GOall = GOterms_perCl20, 
-                        corr_clAll = corr_allClusters20,
-                        clust_total = 20, thresh = 0.4)
-PandC20_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster20,
-                       GO_list_perCl=GO_list_perCl20, 
-                       corr_clAll=corr_allClusters20,
-                       wGO_allClusters=wGO_allClusters20_40,
-                       clust_total=20, thresh=0.4)
-saveRDS(PandC20_40, "PandC20_40.rds")
-
-
-
-start.time <- Sys.time()
-wGO_allClusters20_80 <- impute(cl_GOall = GOterms_perCl20, 
-     corr_clAll = corr_allClusters20,
-     clust_total = 20, thresh = 0.8)
-
-PandC20_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster20,
-                       GO_list_perCl=GO_list_perCl20, 
-                       corr_clAll=corr_allClusters20,
-                       wGO_allClusters=wGO_allClusters20_80,
-                       clust_total=20, thresh=0.8)
-saveRDS(PandC20_80, "PandC20_80.rds")
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-# ---------------------- 
+# cluster20 <- cuttree_values[["20"]][["GeneID_assignments"]]
+# corr_allClusters20 <- corr_per_clust(logcounts, cluster20, 20)
+# GOterms_perCl20 <- GO_per_cl(GO_table, cluster20, 20)
+# GO_list_perCl20 <- GO_list_perClBlind(GOterms_perCl20, 20)
+# 
+# GO_blindedClusters20 <- GO_per_cl_blinded(GO_blinded, 
+#                         cluster20, GO_list_perCl20, 20)
+# 
+# wGO_blinded20 <- impute(cl_GOall=GOterms_perCl20, 
+#                         corr_clAll=corr_allClusters20, 
+#                         clust_total=20, thresh=0)
+# 
+# # stats for thresholds 
+# wGO_allClusters20_10 <- impute(cl_GOall = GOterms_perCl20, 
+#                         corr_clAll = corr_allClusters20,
+#                         clust_total = 20, thresh = 0.1)
+# SandC20_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster20,
+#                        GO_list_perCl=GO_list_perCl20, 
+#                        corr_clAll=corr_allClusters20,
+#                        wGO_allClusters=wGO_allClusters20_10,
+#                        clust_total=20, thresh=0.1)
+# saveRDS(SandC20_10, "SandC20_10.rds")
+# 
+# 
+# 
+# wGO_allClusters20_40 <- impute(cl_GOall = GOterms_perCl20, 
+#                         corr_clAll = corr_allClusters20,
+#                         clust_total = 20, thresh = 0.4)
+# SandC20_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster20,
+#                        GO_list_perCl=GO_list_perCl20, 
+#                        corr_clAll=corr_allClusters20,
+#                        wGO_allClusters=wGO_allClusters20_40,
+#                        clust_total=20, thresh=0.4)
+# saveRDS(SandC20_40, "SandC20_40.rds")
+# 
+# 
+# 
+# start.time <- Sys.time()
+# wGO_allClusters20_80 <- impute(cl_GOall = GOterms_perCl20, 
+#      corr_clAll = corr_allClusters20,
+#      clust_total = 20, thresh = 0.8)
+# 
+# SandC20_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster20,
+#                        GO_list_perCl=GO_list_perCl20, 
+#                        corr_clAll=corr_allClusters20,
+#                        wGO_allClusters=wGO_allClusters20_80,
+#                        clust_total=20, thresh=0.8)
+# saveRDS(SandC20_80, "SandC20_80.rds")
+# end.time <- Sys.time()
+# time.taken <- end.time - start.time
+# time.taken
+# # ---------------------- 
 
 
 # for 50 clusters (run inputs)
@@ -175,313 +171,308 @@ GO_list_perCl50 <- GO_list_perClBlind(GOterms_perCl50, 50)
 GO_blindedClusters50 <- GO_per_cl_blinded(GO_blinded, 
                         cluster50, GO_list_perCl50, 50)
 
-#wGO_blinded50 <- impute(cl_GOall=GOterms_perCl50, 
-#                        corr_clAll=corr_allClusters50, 
-#                        clust_total=50, thresh=0)
-
-# stats for thresholds 
 wGO_allClusters50_10 <- impute(cl_GOall = GOterms_perCl50, 
                         corr_clAll = corr_allClusters50,
                         clust_total = 50, thresh = 0.1)
-PandC50_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster50,
+SandC50_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster50,
                        GO_list_perCl=GO_list_perCl50, 
                        corr_clAll=corr_allClusters50,
                        wGO_allClusters=wGO_allClusters50_10,
                        clust_total=50, thresh=0.1)
-saveRDS(PandC50_10, "PandC50_10.rds")
+saveRDS(SandC50_10, "SandC50_10.rds")
 
 
-wGO_allClusters50_40 <- impute(cl_GOall = GOterms_perCl50, 
-                        corr_clAll = corr_allClusters50,
-                        clust_total = 50, thresh = 0.4)
-PandC50_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster50,
-                       GO_list_perCl=GO_list_perCl50, 
-                       corr_clAll=corr_allClusters50,
-                       wGO_allClusters=wGO_allClusters50_40,
-                       clust_total=50, thresh=0.4)
-saveRDS(PandC50_40, "PandC50_40.rds")
-
-start.time <- Sys.time()
-wGO_allClusters50_80 <- impute(cl_GOall = GOterms_perCl50, 
-                        corr_clAll = corr_allClusters50,
-                        clust_total = 50, thresh = 0.8)
-
-PandC50_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster50,
-                       GO_list_perCl=GO_list_perCl50, 
-                       corr_clAll=corr_allClusters50,
-                       wGO_allClusters=wGO_allClusters50_80,
-                       clust_total=50, thresh=0.8)
-saveRDS(PandC50_80, "PandC50_80.rds")
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
+# wGO_allClusters50_40 <- impute(cl_GOall = GOterms_perCl50, 
+#                         corr_clAll = corr_allClusters50,
+#                         clust_total = 50, thresh = 0.4)
+# SandC50_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster50,
+#                        GO_list_perCl=GO_list_perCl50, 
+#                        corr_clAll=corr_allClusters50,
+#                        wGO_allClusters=wGO_allClusters50_40,
+#                        clust_total=50, thresh=0.4)
+# saveRDS(SandC50_40, "SandC50_40.rds")
+# 
+# start.time <- Sys.time()
+# wGO_allClusters50_80 <- impute(cl_GOall = GOterms_perCl50, 
+#                         corr_clAll = corr_allClusters50,
+#                         clust_total = 50, thresh = 0.8)
+# 
+# SandC50_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster50,
+#                        GO_list_perCl=GO_list_perCl50, 
+#                        corr_clAll=corr_allClusters50,
+#                        wGO_allClusters=wGO_allClusters50_80,
+#                        clust_total=50, thresh=0.8)
+# saveRDS(SandC50_80, "SandC50_80.rds")
+# end.time <- Sys.time()
+# time.taken <- end.time - start.time
+# time.taken
 # ---------------------- 
 
 
 # for 200 clusters (run inputs)
 # ---------------------- 
-cluster200 <- cuttree_values[["200"]][["GeneID_assignments"]]
-corr_allClusters200 <- corr_per_clust(logcounts, cluster200, 200)
-GOterms_perCl200 <- GO_per_cl(GO_table, cluster200, 200)
-GO_list_perCl200 <- GO_list_perClBlind(GOterms_perCl200, 200)
-
-GO_blindedClusters200 <- GO_per_cl_blinded(GO_blinded, 
-                        cluster200, GO_list_perCl200, 200)
-
-# stats for thresholds 
-wGO_allClusters200_10 <- impute(cl_GOall = GOterms_perCl200, 
-                        corr_clAll = corr_allClusters200,
-                        clust_total = 200, thresh = 0.1)
-
-PandC200_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster200,
-                       GO_list_perCl=GO_list_perCl200, 
-                       corr_clAll=corr_allClusters200,
-                       wGO_allClusters=wGO_allClusters200_10,
-                       clust_total=200, thresh=0.1)
-saveRDS(PandC200_10, "PandC200_10.rds")
-
-
-wGO_allClusters200_40 <- impute(cl_GOall = GOterms_perCl200, 
-                        corr_clAll = corr_allClusters200,
-                        clust_total = 200, thresh = 0.4)
-PandC200_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster200,
-                       GO_list_perCl=GO_list_perCl200, 
-                       corr_clAll=corr_allClusters200,
-                       wGO_allClusters=wGO_allClusters200_40,
-                       clust_total=200, thresh=0.4)
-saveRDS(PandC200_40, "PandC200_40.rds")
-
-start.time <- Sys.time()
-wGO_allClusters200_80 <- impute(cl_GOall = GOterms_perCl200, 
-                        corr_clAll = corr_allClusters200,
-                        clust_total = 200, thresh = 0.8)
-
-PandC200_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster200,
-                       GO_list_perCl=GO_list_perCl200, 
-                       corr_clAll=corr_allClusters200,
-                       wGO_allClusters=wGO_allClusters200_80,
-                       clust_total=200, thresh=0.8)
-saveRDS(PandC200_80, "PandC200_80.rds")
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-# ---------------------- 
+# cluster200 <- cuttree_values[["200"]][["GeneID_assignments"]]
+# corr_allClusters200 <- corr_per_clust(logcounts, cluster200, 200)
+# GOterms_perCl200 <- GO_per_cl(GO_table, cluster200, 200)
+# GO_list_perCl200 <- GO_list_perClBlind(GOterms_perCl200, 200)
+# 
+# GO_blindedClusters200 <- GO_per_cl_blinded(GO_blinded, 
+#                         cluster200, GO_list_perCl200, 200)
+# 
+# # stats for thresholds 
+# wGO_allClusters200_10 <- impute(cl_GOall = GOterms_perCl200, 
+#                         corr_clAll = corr_allClusters200,
+#                         clust_total = 200, thresh = 0.1)
+# 
+# SandC200_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster200,
+#                        GO_list_perCl=GO_list_perCl200, 
+#                        corr_clAll=corr_allClusters200,
+#                        wGO_allClusters=wGO_allClusters200_10,
+#                        clust_total=200, thresh=0.1)
+# saveRDS(SandC200_10, "SandC200_10.rds")
+# 
+# 
+# wGO_allClusters200_40 <- impute(cl_GOall = GOterms_perCl200, 
+#                         corr_clAll = corr_allClusters200,
+#                         clust_total = 200, thresh = 0.4)
+# SandC200_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster200,
+#                        GO_list_perCl=GO_list_perCl200, 
+#                        corr_clAll=corr_allClusters200,
+#                        wGO_allClusters=wGO_allClusters200_40,
+#                        clust_total=200, thresh=0.4)
+# saveRDS(SandC200_40, "SandC200_40.rds")
+# 
+# start.time <- Sys.time()
+# wGO_allClusters200_80 <- impute(cl_GOall = GOterms_perCl200, 
+#                         corr_clAll = corr_allClusters200,
+#                         clust_total = 200, thresh = 0.8)
+# 
+# SandC200_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster200,
+#                        GO_list_perCl=GO_list_perCl200, 
+#                        corr_clAll=corr_allClusters200,
+#                        wGO_allClusters=wGO_allClusters200_80,
+#                        clust_total=200, thresh=0.8)
+# saveRDS(SandC200_80, "SandC200_80.rds")
+# end.time <- Sys.time()
+# time.taken <- end.time - start.time
+# time.taken
+# # ---------------------- 
 
 
 # for 500 clusters (run inputs)
 # ---------------------- 
-cluster500 <- cuttree_values[["500"]][["GeneID_assignments"]]
-corr_allClusters500 <- corr_per_clust(logcounts, cluster500, 500)
-GOterms_perCl500 <- GO_per_cl(GO_table, cluster500, 500)
-GO_list_perCl500 <- GO_list_perClBlind(GOterms_perCl500, 500)
-
-GO_blindedClusters500 <- GO_per_cl_blinded(GO_blinded, 
-                        cluster500, GO_list_perCl500, 500)
-
-# stats for thresholds 
-wGO_allClusters500_10 <- impute(cl_GOall = GOterms_perCl500, 
-                        corr_clAll = corr_allClusters500,
-                        clust_total = 500, thresh = 0.1)
-PandC500_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster500,
-                       GO_list_perCl=GO_list_perCl500, 
-                       corr_clAll=corr_allClusters500,
-                       wGO_allClusters=wGO_allClusters500_10,
-                       clust_total=500, thresh=0.1)
-saveRDS(PandC500_10, "PandC500_10.rds")
-
-
-wGO_allClusters500_40 <- impute(cl_GOall = GOterms_perCl500, 
-                        corr_clAll = corr_allClusters500,
-                        clust_total = 500, thresh = 0.4)
-PandC500_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster500,
-                       GO_list_perCl=GO_list_perCl500, 
-                       corr_clAll=corr_allClusters500,
-                       wGO_allClusters=wGO_allClusters500_40,
-                       clust_total=500, thresh=0.4)
-saveRDS(PandC500_40, "PandC500_40.rds")
-
-start.time <- Sys.time()
-wGO_allClusters500_80 <- impute(cl_GOall = GOterms_perCl500, 
-                        corr_clAll = corr_allClusters500,
-                        clust_total = 500, thresh = 0.8)
-
-PandC500_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster500,
-                       GO_list_perCl=GO_list_perCl500, 
-                       corr_clAll=corr_allClusters500,
-                       wGO_allClusters=wGO_allClusters500_80,
-                       clust_total=500, thresh=0.8)
-saveRDS(PandC500_80, "PandC500_80.rds")
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-# ----------------------
+# cluster500 <- cuttree_values[["500"]][["GeneID_assignments"]]
+# corr_allClusters500 <- corr_per_clust(logcounts, cluster500, 500)
+# GOterms_perCl500 <- GO_per_cl(GO_table, cluster500, 500)
+# GO_list_perCl500 <- GO_list_perClBlind(GOterms_perCl500, 500)
+# 
+# GO_blindedClusters500 <- GO_per_cl_blinded(GO_blinded, 
+#                         cluster500, GO_list_perCl500, 500)
+# 
+# # stats for thresholds 
+# wGO_allClusters500_10 <- impute(cl_GOall = GOterms_perCl500, 
+#                         corr_clAll = corr_allClusters500,
+#                         clust_total = 500, thresh = 0.1)
+# SandC500_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster500,
+#                        GO_list_perCl=GO_list_perCl500, 
+#                        corr_clAll=corr_allClusters500,
+#                        wGO_allClusters=wGO_allClusters500_10,
+#                        clust_total=500, thresh=0.1)
+# saveRDS(SandC500_10, "SandC500_10.rds")
+# 
+# 
+# wGO_allClusters500_40 <- impute(cl_GOall = GOterms_perCl500, 
+#                         corr_clAll = corr_allClusters500,
+#                         clust_total = 500, thresh = 0.4)
+# SandC500_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster500,
+#                        GO_list_perCl=GO_list_perCl500, 
+#                        corr_clAll=corr_allClusters500,
+#                        wGO_allClusters=wGO_allClusters500_40,
+#                        clust_total=500, thresh=0.4)
+# saveRDS(SandC500_40, "SandC500_40.rds")
+# 
+# start.time <- Sys.time()
+# wGO_allClusters500_80 <- impute(cl_GOall = GOterms_perCl500, 
+#                         corr_clAll = corr_allClusters500,
+#                         clust_total = 500, thresh = 0.8)
+# 
+# SandC500_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster500,
+#                        GO_list_perCl=GO_list_perCl500, 
+#                        corr_clAll=corr_allClusters500,
+#                        wGO_allClusters=wGO_allClusters500_80,
+#                        clust_total=500, thresh=0.8)
+# saveRDS(SandC500_80, "SandC500_80.rds")
+# end.time <- Sys.time()
+# time.taken <- end.time - start.time
+# time.taken
+# # ----------------------
 
 
 # for 300 clusters (run inputs)
 # ---------------------- 
-cluster300 <- cuttree_values[["300"]][["GeneID_assignments"]]
-corr_allClusters300 <- corr_per_clust(logcounts, cluster300, 300)
-GOterms_perCl300 <- GO_per_cl(GO_table, cluster300, 300)
-GO_list_perCl300 <- GO_list_perClBlind(GOterms_perCl300, 300)
-
-GO_blindedClusters300 <- GO_per_cl_blinded(GO_blinded, 
-                        cluster300, GO_list_perCl300, 300)
-
-# stats for thresholds 
-wGO_allClusters300_10 <- impute(cl_GOall = GOterms_perCl300, 
-                        corr_clAll = corr_allClusters300,
-                        clust_total = 300, thresh = 0.1)
-PandC300_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster300,
-                       GO_list_perCl=GO_list_perCl300, 
-                       corr_clAll=corr_allClusters300,
-                       wGO_allClusters=wGO_allClusters300_10,
-                       clust_total=300, thresh=0.1)
-saveRDS(PandC300_10, "PandC300_10.rds")
-
-
-wGO_allClusters300_40 <- impute(cl_GOall = GOterms_perCl300, 
-                        corr_clAll = corr_allClusters300,
-                        clust_total = 300, thresh = 0.4)
-PandC300_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster300,
-                       GO_list_perCl=GO_list_perCl300, 
-                       corr_clAll=corr_allClusters300,
-                       wGO_allClusters=wGO_allClusters300_40,
-                       clust_total=300, thresh=0.4)
-saveRDS(PandC300_40, "PandC300_40.rds")
-
-start.time <- Sys.time()
-wGO_allClusters300_80 <- impute(cl_GOall = GOterms_perCl300, 
-                        corr_clAll = corr_allClusters300,
-                        clust_total = 300, thresh = 0.8)
-
-PandC300_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster300,
-                       GO_list_perCl=GO_list_perCl300, 
-                       corr_clAll=corr_allClusters300,
-                       wGO_allClusters=wGO_allClusters300_80,
-                       clust_total=300, thresh=0.8)
-saveRDS(PandC300_80, "PandC300_80.rds")
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-# ---------------------- 
+# cluster300 <- cuttree_values[["300"]][["GeneID_assignments"]]
+# corr_allClusters300 <- corr_per_clust(logcounts, cluster300, 300)
+# GOterms_perCl300 <- GO_per_cl(GO_table, cluster300, 300)
+# GO_list_perCl300 <- GO_list_perClBlind(GOterms_perCl300, 300)
+# 
+# GO_blindedClusters300 <- GO_per_cl_blinded(GO_blinded, 
+#                         cluster300, GO_list_perCl300, 300)
+# 
+# # stats for thresholds 
+# wGO_allClusters300_10 <- impute(cl_GOall = GOterms_perCl300, 
+#                         corr_clAll = corr_allClusters300,
+#                         clust_total = 300, thresh = 0.1)
+# SandC300_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster300,
+#                        GO_list_perCl=GO_list_perCl300, 
+#                        corr_clAll=corr_allClusters300,
+#                        wGO_allClusters=wGO_allClusters300_10,
+#                        clust_total=300, thresh=0.1)
+# saveRDS(SandC300_10, "SandC300_10.rds")
+# 
+# 
+# wGO_allClusters300_40 <- impute(cl_GOall = GOterms_perCl300, 
+#                         corr_clAll = corr_allClusters300,
+#                         clust_total = 300, thresh = 0.4)
+# SandC300_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster300,
+#                        GO_list_perCl=GO_list_perCl300, 
+#                        corr_clAll=corr_allClusters300,
+#                        wGO_allClusters=wGO_allClusters300_40,
+#                        clust_total=300, thresh=0.4)
+# saveRDS(SandC300_40, "SandC300_40.rds")
+# 
+# start.time <- Sys.time()
+# wGO_allClusters300_80 <- impute(cl_GOall = GOterms_perCl300, 
+#                         corr_clAll = corr_allClusters300,
+#                         clust_total = 300, thresh = 0.8)
+# 
+# SandC300_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster300,
+#                        GO_list_perCl=GO_list_perCl300, 
+#                        corr_clAll=corr_allClusters300,
+#                        wGO_allClusters=wGO_allClusters300_80,
+#                        clust_total=300, thresh=0.8)
+# saveRDS(SandC300_80, "SandC300_80.rds")
+# end.time <- Sys.time()
+# time.taken <- end.time - start.time
+# time.taken
+# # ---------------------- 
 
 
 # for 100 clusters (run inputs)
 # ---------------------- 
-cluster100 <- cuttree_values[["100"]][["GeneID_assignments"]]
-corr_allClusters100 <- corr_per_clust(logcounts, cluster100, 100)
-GOterms_perCl100 <- GO_per_cl(GO_table, cluster100, 100)
-GO_list_perCl100 <- GO_list_perClBlind(GOterms_perCl100, 100)
-
-GO_blindedClusters100 <- GO_per_cl_blinded(GO_blinded, 
-                        cluster100, GO_list_perCl100, 100)
-
-# stats for thresholds 
-wGO_allClusters100_10 <- impute(cl_GOall = GOterms_perCl100, 
-                        corr_clAll = corr_allClusters100,
-                        clust_total = 100, thresh = 0.1)
-PandC100_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster100,
-                       GO_list_perCl=GO_list_perCl100, 
-                       corr_clAll=corr_allClusters100,
-                       wGO_allClusters=wGO_allClusters100_10,
-                       clust_total=100, thresh=0.1)
-saveRDS(PandC100_10, "PandC100_10.rds")
-
-
-wGO_allClusters100_40 <- impute(cl_GOall = GOterms_perCl100, 
-                        corr_clAll = corr_allClusters100,
-                        clust_total = 100, thresh = 0.4)
-PandC100_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster100,
-                       GO_list_perCl=GO_list_perCl100, 
-                       corr_clAll=corr_allClusters100,
-                       wGO_allClusters=wGO_allClusters100_40,
-                       clust_total=100, thresh=0.4)
-saveRDS(PandC100_40, "PandC100_40.rds")
-
-start.time <- Sys.time()
-wGO_allClusters100_80 <- impute(cl_GOall = GOterms_perCl100, 
-                        corr_clAll = corr_allClusters100,
-                        clust_total = 100, thresh = 0.8)
-
-PandC100_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster100,
-                       GO_list_perCl=GO_list_perCl100, 
-                       corr_clAll=corr_allClusters100,
-                       wGO_allClusters=wGO_allClusters100_80,
-                       clust_total=100, thresh=0.8)
-saveRDS(PandC100_80, "PandC100_80.rds")
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-# ---------------------- 
+# cluster100 <- cuttree_values[["100"]][["GeneID_assignments"]]
+# corr_allClusters100 <- corr_per_clust(logcounts, cluster100, 100)
+# GOterms_perCl100 <- GO_per_cl(GO_table, cluster100, 100)
+# GO_list_perCl100 <- GO_list_perClBlind(GOterms_perCl100, 100)
+# 
+# GO_blindedClusters100 <- GO_per_cl_blinded(GO_blinded, 
+#                         cluster100, GO_list_perCl100, 100)
+# 
+# # stats for thresholds 
+# wGO_allClusters100_10 <- impute(cl_GOall = GOterms_perCl100, 
+#                         corr_clAll = corr_allClusters100,
+#                         clust_total = 100, thresh = 0.1)
+# SandC100_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster100,
+#                        GO_list_perCl=GO_list_perCl100, 
+#                        corr_clAll=corr_allClusters100,
+#                        wGO_allClusters=wGO_allClusters100_10,
+#                        clust_total=100, thresh=0.1)
+# saveRDS(SandC100_10, "SandC100_10.rds")
+# 
+# 
+# wGO_allClusters100_40 <- impute(cl_GOall = GOterms_perCl100, 
+#                         corr_clAll = corr_allClusters100,
+#                         clust_total = 100, thresh = 0.4)
+# SandC100_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster100,
+#                        GO_list_perCl=GO_list_perCl100, 
+#                        corr_clAll=corr_allClusters100,
+#                        wGO_allClusters=wGO_allClusters100_40,
+#                        clust_total=100, thresh=0.4)
+# saveRDS(SandC100_40, "SandC100_40.rds")
+# 
+# start.time <- Sys.time()
+# wGO_allClusters100_80 <- impute(cl_GOall = GOterms_perCl100, 
+#                         corr_clAll = corr_allClusters100,
+#                         clust_total = 100, thresh = 0.8)
+# 
+# SandC100_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster100,
+#                        GO_list_perCl=GO_list_perCl100, 
+#                        corr_clAll=corr_allClusters100,
+#                        wGO_allClusters=wGO_allClusters100_80,
+#                        clust_total=100, thresh=0.8)
+# saveRDS(SandC100_80, "SandC100_80.rds")
+# end.time <- Sys.time()
+# time.taken <- end.time - start.time
+# time.taken
+# # ---------------------- 
 
 
 # for 1000 clusters (run inputs)
 # ---------------------- 
-cluster1000 <- cuttree_values[["1000"]][["GeneID_assignments"]]
-corr_allClusters1000 <- corr_per_clust(logcounts, cluster1000, 1000)
-
-GOterms_perCl1000 <- GO_per_cl(GO_table, cluster1000, 1000)
-saveRDS(GOterms_perCl1000, "GOterms_perCl1000.rds")
-GO_list_perCl1000 <- GO_list_perClBlind(GOterms_perCl1000, 1000)
-saveRDS(GO_list_perCl1000,"GO_list_perCl1000.rds")
-GO_blindedClusters1000 <- GO_per_cl_blinded(GO_blinded, 
-                        cluster1000, GO_list_perCl1000, 1000)
-saveRDS(GO_blindedClusters1000, "GO_blindedClusters1000.rds")
-# stats for thresholds 
-wGO_allClusters1000_10 <- impute(cl_GOall = GOterms_perCl1000, 
-                        corr_clAll = corr_allClusters1000,
-                        clust_total = 1000, thresh = 0.1)
-PandC1000_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster1000,
-                       GO_list_perCl=GO_list_perCl1000, 
-                       corr_clAll=corr_allClusters1000,
-                       wGO_allClusters=wGO_allClusters1000_10,
-                       clust_total=1000, thresh=0.1)
-saveRDS(PandC1000_10, "PandC1000_10.rds")
-
-start.time <- Sys.time()
-wGO_allClusters1000_40 <- impute(cl_GOall = GOterms_perCl1000, 
-                        corr_clAll = corr_allClusters1000,
-                        clust_total = 1000, thresh = 0.4)
-PandC1000_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster1000,
-                       GO_list_perCl=GO_list_perCl1000, 
-                       corr_clAll=corr_allClusters1000,
-                       wGO_allClusters=wGO_allClusters1000_40,
-                       clust_total=1000, thresh=0.4)
-saveRDS(PandC1000_40, "PandC1000_40.rds")
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-
-
-start.time <- Sys.time()
-wGO_allClusters1000_80 <- impute(cl_GOall = GOterms_perCl1000, 
-                        corr_clAll = corr_allClusters1000,
-                        clust_total = 1000, thresh = 0.8)
-
-PandC1000_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster1000,
-                       GO_list_perCl=GO_list_perCl1000, 
-                       corr_clAll=corr_allClusters1000,
-                       wGO_allClusters=wGO_allClusters1000_80,
-                       clust_total=1000, thresh=0.8)
-saveRDS(PandC1000_80, "PandC1000_80.rds")
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-
-PandC1000_90 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster1000,
-                       GO_list_perCl=GO_list_perCl1000, 
-                       corr_clAll=corr_allClusters1000,
-                       wGO_allClusters=wGO_allClusters1000_90,
-                       clust_total=1000, thresh=0.9)
-saveRDS(PandC1000_80, "PandC1000_90.rds")
-
-PandC1000_100 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster1000,
-                       GO_list_perCl=GO_list_perCl1000, 
-                       corr_clAll=corr_allClusters1000,
-                       wGO_allClusters=wGO_allClusters1000_100,
-                       clust_total=1000, thresh=1)
-saveRDS(PandC1000_80, "PandC1000_100.rds")
-# ---------------------- 
+# cluster1000 <- cuttree_values[["1000"]][["GeneID_assignments"]]
+# corr_allClusters1000 <- corr_per_clust(logcounts, cluster1000, 1000)
+# 
+# GOterms_perCl1000 <- GO_per_cl(GO_table, cluster1000, 1000)
+# saveRDS(GOterms_perCl1000, "GOterms_perCl1000.rds")
+# GO_list_perCl1000 <- GO_list_perClBlind(GOterms_perCl1000, 1000)
+# saveRDS(GO_list_perCl1000,"GO_list_perCl1000.rds")
+# GO_blindedClusters1000 <- GO_per_cl_blinded(GO_blinded, 
+#                         cluster1000, GO_list_perCl1000, 1000)
+# saveRDS(GO_blindedClusters1000, "GO_blindedClusters1000.rds")
+# # stats for thresholds 
+# wGO_allClusters1000_10 <- impute(cl_GOall = GOterms_perCl1000, 
+#                         corr_clAll = corr_allClusters1000,
+#                         clust_total = 1000, thresh = 0.1)
+# SandC1000_10 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster1000,
+#                        GO_list_perCl=GO_list_perCl1000, 
+#                        corr_clAll=corr_allClusters1000,
+#                        wGO_allClusters=wGO_allClusters1000_10,
+#                        clust_total=1000, thresh=0.1)
+# saveRDS(SandC1000_10, "SandC1000_10.rds")
+# 
+# start.time <- Sys.time()
+# wGO_allClusters1000_40 <- impute(cl_GOall = GOterms_perCl1000, 
+#                         corr_clAll = corr_allClusters1000,
+#                         clust_total = 1000, thresh = 0.4)
+# SandC1000_40 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster1000,
+#                        GO_list_perCl=GO_list_perCl1000, 
+#                        corr_clAll=corr_allClusters1000,
+#                        wGO_allClusters=wGO_allClusters1000_40,
+#                        clust_total=1000, thresh=0.4)
+# saveRDS(SandC1000_40, "SandC1000_40.rds")
+# end.time <- Sys.time()
+# time.taken <- end.time - start.time
+# time.taken
+# 
+# 
+# start.time <- Sys.time()
+# wGO_allClusters1000_80 <- impute(cl_GOall = GOterms_perCl1000, 
+#                         corr_clAll = corr_allClusters1000,
+#                         clust_total = 1000, thresh = 0.8)
+# 
+# SandC1000_80 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster1000,
+#                        GO_list_perCl=GO_list_perCl1000, 
+#                        corr_clAll=corr_allClusters1000,
+#                        wGO_allClusters=wGO_allClusters1000_80,
+#                        clust_total=1000, thresh=0.8)
+# saveRDS(SandC1000_80, "SandC1000_80.rds")
+# end.time <- Sys.time()
+# time.taken <- end.time - start.time
+# time.taken
+# 
+# SandC1000_90 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster1000,
+#                        GO_list_perCl=GO_list_perCl1000, 
+#                        corr_clAll=corr_allClusters1000,
+#                        wGO_allClusters=wGO_allClusters1000_90,
+#                        clust_total=1000, thresh=0.9)
+# saveRDS(SandC1000_80, "SandC1000_90.rds")
+# 
+# SandC1000_100 <- cross_val(n=10, GO_annot=GO_table, clusters=cluster1000,
+#                        GO_list_perCl=GO_list_perCl1000, 
+#                        corr_clAll=corr_allClusters1000,
+#                        wGO_allClusters=wGO_allClusters1000_100,
+#                        clust_total=1000, thresh=1)
+# saveRDS(SandC1000_80, "SandC1000_100.rds")
+# # ---------------------- 
 
 ```
 
@@ -490,31 +481,32 @@ saveRDS(PandC1000_80, "PandC1000_100.rds")
 ```{r}
 
 # Get the list of all the files for Pearson + complete linkage kfold validation
-files <- list.files(pattern ='^PandC.')
-# Get the list of all the PandC rds files sans extension
-files_names <- file_path_sans_ext(list.files(pattern ='^PandC.'))
+files <- list.files(pattern ='^SandC.')
+# Get the list of all the SandC rds files sans extension
+files_names <- file_path_sans_ext(list.files(pattern ='^SandC.'))
 # Put all the dataframes in one list
 dat_list <- sapply(files,function (x) readRDS(x), simplify = FALSE, USE.NAMES = TRUE)
 # Change the names to get rid of the extension
 names(dat_list) <- files_names
+dat_list2 <- lapply(dat_list, function(x) x[names(x)!="Index_folds"])
 
 # Put all the F1 socres of each fold in one array
-F1_PandC <- sapply(dat_list, function(x){
+F1_SandC <- sapply(dat_list2, function(x){
   sapply(x, function(x) {x[length(x)]})
 }, simplify = "array", USE.NAMES = TRUE)
 
 # Transform the array into a dataframe 
-F1_PandC_list <- as.data.frame(F1_PandC)
-F1_PandC_df <- t(do.call(rbind, lapply(F1_PandC_list, data.frame, stringsAsFactors=FALSE)))
+F1_SandC_list <- as.data.frame(F1_SandC)
+F1_SandC_df <- t(do.call(rbind, lapply(F1_SandC_list, data.frame, stringsAsFactors=FALSE)))
 # Get the mean for each column and append to the existing table
-Mean.F1_Score <- colMeans(F1_PandC_df)
-F1_PandC_df <- rbind(F1_PandC_df, Mean.F1_Score)
-rownames(F1_PandC_df)[rownames(F1_PandC_df) == "11"] <- "Mean.F1_Score"
-saveRDS(F1_PandC_df, "F1_PandC_df.rds")
+Mean.F1_Score <- colMeans(F1_SandC_df)
+F1_SandC_df <- rbind(F1_SandC_df, Mean.F1_Score)
+rownames(F1_SandC_df)[rownames(F1_SandC_df) == "11"] <- "Mean.F1_Score"
+saveRDS(F1_SandC_df, "F1_SandC_df.rds")
 
 # List the all the mean predicton scores for each parameter 
-summary_all_PandC <- summary_Csweep(dat_list)
-saveRDS(summary_all_PandC, "summary_all_PandC.rds")
+summary_all_SandC <- summary_Csweep(dat_list2)
+saveRDS(summary_all_SandC, "summary_all_SandC.rds")
 
 
 ```
