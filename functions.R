@@ -1,6 +1,9 @@
 ### ------------- Data Prep 
 
 # Sequencing Run aggregate function
+# Note for Mark: kindly let me know how to cite this properly. 
+# This code was from your github. 
+
 srx_agg <- function(x,counts="GeneCounts") {
   IDX=which(names(x) %in% "GeneCounts")
   mds<-x$MetadataSummary
@@ -55,28 +58,8 @@ cluster <- function(counts, cut_hmax){
 }
 
 
-# This function's output is a nested list with of the genes grouped per 
-# cluster and their corresponding correlation values. 
-# Inputs:
-# x = logcounts (normalized gene counts from RNA seq)
-# y = clusters (matrix of genes w/ cluster number)
-# clust_total = total number of clusters
-
-corr_per_clust <- function(x, y, clust_total){
-  corr_cl <- list()
-  for (i in 1:clust_total){
-    clusterX <- y[y$ClusterNumber == i,]
-    cluster_list <- as.list(clusterX$GeneID)
-    cluster <- x[rownames(x) %in% cluster_list,]
-    corr_result <- cor(t(cluster))
-    corr_cl[[paste0("Cluster", i)]] <- corr_result
-  }
-  return(corr_cl)
-}
-
-
 # This function's output is a list of data frames containing all GO 
-# terms associated with the genes belonging to a cluster. 
+# terms of GeneIDs grouped by cluster. 
 # Input:
 # GO_annot = scerevisiae_GO_matrix_wide (matrix of genes belonging to a GO term)
 # y = clusters (matrix of genes w/ cluster number)
@@ -99,7 +82,7 @@ GO_per_cl <- function(GO_annot, clusters, clust_total){
 
 ### ------------- Cluster Analysis
 
-# This function's output is a nested list with of the genes grouped 
+# This function's output is a nested list of the genes grouped 
 # per cluster and their corresponding correlation values. 
 # Inputs:
 # x = logcounts (normalized gene counts from RNA seq)
@@ -119,8 +102,10 @@ corr_per_clust <- function(x, y, clust_total){
 }
 
 
-# This function's output is a list of data frames clustered genes 
-# with different total clusters. 
+# This function's output is a list  grouped by total clusters 
+# which gives (1) a table of GeneIDs assigned to a cluster number, 
+# (2) the cutree denominator to achieve that total cluster, and
+# (3) the tally of the total Gene IDs belonging to a cluster number.
 # Input:
 # hr = heirarchical clustering object
 # min and max = minimum and maximum value of the denominator used
@@ -165,7 +150,7 @@ cl_lengthCut <- function(hr, min, max, interval){
 
 
 # This function's output is a list of data frames containing all 
-# GO terms associated with the genes belonging to a cluster. 
+# GO terms associated with the genes belonging to a particular cluster. 
 # Input:
 # x = scerevisiae_GO_matrix_wide (matrix of genes belonging to a GO term)
 # y = clusters (matrix of genes w/ cluster number)
@@ -411,8 +396,6 @@ stats_cl <- function(input_df, blinded_df, clust_total){
   
   for (i in 1:clust_total){
     
-    print(paste0("scl", i))
-    
     input <- input_df[[i]][["Input"]]
     blind <- blinded_df[[i]][["Diff"]]
     
@@ -540,11 +523,9 @@ cross_val <- function(n, GO_annot, clusters,
   folds <- sample(1:nfolds, nrow(GO_annot), replace = TRUE)
   
   dict_folds <- data.frame(GO_annot$GeneID, folds)
-  saveRDS(dict_folds, "dict_folds.rds")
   
   for (i in 1:n){
     
-    print(i)
     which_fold <- i
     
     ind_blinded <- which(dict_folds$folds == which_fold)
@@ -658,6 +639,52 @@ summary_Csweep <- function(kfold_list){
     rownames(summary_df)[rownames(summary_df) == "Mean"] <- row_name
   }
   return(summary_df)
+}
+
+
+# This function outputs a nested list of prediction scores from 
+# a 10-fold validation process. Scores are grouped by a parameter pair
+# consisting of a total cluster and a threshold value. Each threshold 
+# value will be applied to each total cluster value.
+# Inputs:
+# cl_list = a numerical list denoting the target total cluster from 20 to 2000
+# thresh_list = a numerical list denoting the target threshold value from 0 to 1
+# cuttree_values = the output of the cl_lengthCut()  function which gives a table
+#                 of GeneIDs assigned to clusters
+# logcounts = normalized gene counts from RNA seq
+# GO_table = the Gene Onltology matrix for all GeneIDs
+# GO_blinded = the Gene Onltology matrix after blinding
+
+kfold <- function(cl_list, thresh_list, cuttree_values, logcounts, GO_table, GO_blinded){
+  
+  scores <- list()
+  
+  for (i in cl_list){
+    print(i)
+    for (j in thresh_list){
+      print(j)
+      cl_tot <- as.character(i)
+      cl <- cuttree_values[[cl_tot]][["GeneID_assignments"]]
+      
+      corr_allCl <- corr_per_clust(logcounts, cl, i)
+      GOterms_perCl <- GO_per_cl(GO_table, cl, i)
+      GO_list_perCl <- GO_list_perClBlind(GOterms_perCl, i)
+      
+      # stats for thresholds
+      wGO_allCl <- impute(cl_GOall = GOterms_perCl,
+                          corr_clAll = corr_allCl,
+                          clust_total = i, thresh = j)
+      
+      sc <- cross_val(n=10, GO_annot=GO_table, clusters=cl,
+                      GO_list_perCl=GO_list_perCl,
+                      corr_clAll=corr_allCl,
+                      wGO_allClusters=wGO_allCl,
+                      clust_total=i, thresh=j)
+      
+      scores[[paste0(i, "_", j)]] <- sc
+    }
+  }
+  return(scores)
 }
 
 
