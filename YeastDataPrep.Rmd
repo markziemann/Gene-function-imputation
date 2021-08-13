@@ -24,16 +24,14 @@ suppressPackageStartupMessages({
     library(tidyr)
     library(data.table)
     library(RColorBrewer)
-    library(Polychrome)
     library(gplots)
     library(edgeR)
+  
+  
+    library(reshape2)
+
+
 })
-
-# Special Installation for edgeR
-
-# if (!requireNamespace("BiocManager", quietly = TRUE))
-#     install.packages("BiocManager")
-# BiocManager::install("edgeR")
 
 source("functions.R")
 
@@ -166,7 +164,7 @@ A CPM of 0.6 is used as it corresponds to a count of 10-15 for the library sizes
 
 Note: When in doubt, a threshold of 1 CPM in at least minimum group sample size is a good rule of thumb.
 
-```{r }
+```{r eval=FALSE, include=FALSE}
 
 # NORMALISATION FOR LIBRARY SIZE BIAS (cpm)
 
@@ -213,6 +211,127 @@ hist(logcounts_PASS)
 
 ```
 
+### Test scaling
+
+```{r echo=TRUE}
+
+agg <- readRDS("agg.rds")
+
+# Z-score scaling
+s_agg <- scale(agg)
+# Matrix is transposed to determine gene level correlation
+tcs_agg <- cor(t(s_agg),method="spearman")
+saveRDS(tcs_agg, "tcs_agg.rds")
+# Database/dataset level correlation
+cs_agg<-cor(s_agg,method="spearman")
+
+# Multi-dimensional Scaling - Torgerson method:
+# deals with numerical distances, in which there is no 
+# measurement error (you have exactly one distance measure for 
+# each pair of items)
+tmds_agg<-cmdscale(dist(t(s_agg)))
+mds_agg<-cmdscale(dist(s_agg))
+
+pdf("Data/Scaling.pdf") 
+#calculate the row mean  
+avcor<-cor(rowMeans(s_agg),s_agg,method="pearson")
+hist(avcor,main="Pearson correlation to dataset average: Passed data")
+mtext(paste("mean=",signif(mean(avcor),3)),cex=1.2)
+avcor<-cor(rowMeans(s_agg),s_agg,method="spearman")
+hist(avcor,main="Spearman correlation to dataset average: Passed data")
+mtext(paste("mean=",signif(mean(avcor),3)),cex=1.2)
+
+
+#noabel
+plot(tmds_agg, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by sample: Passed data", cex=0.6, pch=19)
+#labeled
+plot(tmds_agg, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by sample: Passed data", cex=0.6, pch=19)
+text( tmds_agg , labels=rownames(tmds_agg) ,cex=0.8) 
+#nolabel
+plot(mds_agg, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by gene: Passed data", cex=0.6, pch=19) 
+#label
+plot(mds_agg, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by gene: Passed data", cex=0.6, pch=19)
+text(mds_agg , labels=rownames(mds_agg) ,cex=0.8)
+colfunc <- colorRampPalette(c("blue", "white", "red"))
+dev.off()
+
+
+# ---------
+# Preliminary heatmaps with lower triangle
+
+lt_tcs_agg <- tcs_agg
+lt_tcs_agg[upper.tri(lt_tcs_agg)] <- NA
+
+colfunc <- colorRampPalette(c("blue", "white", "red"))
+png("Data/hm_scaled.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+
+heatmap.2(tcs_agg, dendrogram="row", scale="none", col = colfunc(25), trace="none",margins = c(6,6), cexRow=.4, main="Gene Correlation")
+
+dev.off()
+
+
+#-----
+# CLUSTERING
+
+c<-as.dist(1-cor(t(s_agg), method="spearman"))
+hr2 <- hclust(c , method="complete")
+mycl <- cutree(hr2, h=max(hr2$height/1.78))
+mycl_length <- length(unique(mycl))
+mycl_length
+clusterCols <- brewer.pal(length(unique(mycl)),"Paired")
+myClusterSideBar <- clusterCols[mycl]
+colfunc <- colorRampPalette(c("blue", "white", "red"))
+write.table(mycl,file="Data/Clusters.txt",quote=F,sep="\t")
+
+
+png("Data/PASS_clustered.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+
+heatmap.2(tcs_agg, main="Clustered Genes", Rowv=as.dendrogram(hr2), Colv=as.dendrogram(hr2), 
+ dendrogram="row", scale="none", col = colfunc(25), trace="none", 
+ RowSideColors= myClusterSideBar)
+
+dev.off()
+
+
+
+# -----------
+# logcounts
+
+cor_s_log_t <- cor(t(logcounts),method="spearman")
+saveRDS(cor_s_log_t, "cor_s_log_ts.rds")
+
+
+png("Data/PASS_log.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+
+colfunc <- colorRampPalette(c("blue", "white", "red"))
+
+heatmap.2(cor_s_log_t, col=colfunc(25), scale="none",trace="none",margins = c(6,6), cexRow=.4, main="Gene Correlation: log2")
+
+dev.off()
+
+c<-as.dist(1-cor(t(logcounts), method="spearman"))
+hr2 <- hclust(c , method="complete")
+mycl <- cutree(hr2, h=max(hr2$height/1.605))
+mycl_length <- length(unique(mycl))
+mycl_length
+clusterCols <- brewer.pal(length(unique(mycl)),"Paired")
+myClusterSideBar <- clusterCols[mycl]
+colfunc <- colorRampPalette(c("blue", "white", "red"))
+write.table(mycl,file="Data/Clusters.txt",quote=F,sep="\t")
+
+
+png("Data/PASS_clust_log.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+
+heatmap.2(cor_s_log_t, main="Clustered Genes: log2", Rowv=as.dendrogram(hr2), Colv=as.dendrogram(hr2), 
+ dendrogram="row", scale="none", col = colfunc(25), trace="none", 
+ RowSideColors= myClusterSideBar)
+
+dev.off()
+  
+
+```
+
+
 ### 7. Heirarchical Clustering with PASS only databases
 
 This chunk can be reused for the PASS + Warn or the WARN filters by changing the content of the filename object. Do not forget to change the name of the variable where you will save the clusters for different inputs. 
@@ -227,6 +346,7 @@ logcounts <- readRDS(filename)
 # Hierarchical Clustering
 # Set seed = 42 for reproducibility of clustering
 set.seed(42)
+cl_corr <- 1-cor(t(logcounts), method="spearman")
 cl <-as.dist(1-cor(t(logcounts), method="spearman"))
 hr <- hclust(cl , method="complete")
 saveRDS(hr, "hr_PASS_SandC.rds")
@@ -258,7 +378,7 @@ saveRDS(clusters, "clusters_SandC.rds")
 
 ### 8. Heatmaps for the clusters
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 # Visualizations
 if (!exists("P100")){
   P100 <- createPalette(100,  c("#ff0000", "#00ff00", "#0000ff"))}
@@ -267,15 +387,15 @@ clusterCols <- P100[1:mycl_length]
 myClusterSideBar <- clusterCols[mycl]
 colfunc <- colorRampPalette(c("blue", "white", "red"))
 
-# # Create a 5 x 5 inch png image
-# png("Data/yeast_heatmaps_PASS_normalization_saleColumn.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
-# 
-# # Create the heatmap
-# heatmap.2(logcounts, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
-#           dendrogram="both", scale="column", col = colfunc(25), trace="none",
-#           RowSideColors= myClusterSideBar, margins = c(5,5))
-# 
-# dev.off()
+# Create a 5 x 5 inch png image
+png("Data/heatmaps_PASS_cl_col.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+
+# Create the heatmap
+heatmap.2(cl_corr, main="S.cerevisiae PASS Samples",  Rowv=as.dendrogram(hr),
+          dendrogram="both", scale="col", col = colfunc(25), trace="none",
+          RowSideColors= myClusterSideBar, margins = c(5,5))
+
+dev.off()
 
 ```
 
