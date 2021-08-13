@@ -28,6 +28,7 @@ suppressPackageStartupMessages({
     library(ggplot2)
     library(reshape2)
     library(tools)
+    library (igraph)
 })
 
 source("functions.R")
@@ -261,28 +262,51 @@ ggplot(cuttree_totals_df, aes(x=CuttreeVal, y=ClTot)) +
 dev.off()
 
 
-# Total genes per cluster  – line diagram
+# Total genes per cluster  – violin plot
 clTotals <- do.call(rbind.data.frame, sapply(cuttree_values, "[[", 3))
-clTotals$ClTot <- as.factor(as.numeric(str_extract_all(rownames(clTotals), "^[:digit:]*(?=.)")))
-clTotals$ClNum <- as.numeric(str_extract_all(rownames(clTotals), "(?=.)\\d+$"))
-colnames(clTotals)[1] <- "GeneTot"
+clTotals$ClusterSize <- as.factor(as.numeric(str_extract_all(rownames(clTotals), "^[:digit:]*(?=.)")))
+clTotals$ClusterID <- as.numeric(str_extract_all(rownames(clTotals), "(?=.)\\d+$"))
+colnames(clTotals)[1] <- "TotalGenes"
 rownames(clTotals) <- c()
 
+# Filter according to cluster size
+cluster20_100 <- clTotals[clTotals$ClusterSize %in% c(20,50,100),]
+cluster200_500 <- clTotals[clTotals$ClusterSize %in% c(200, 300, 500),]
+cluster800_1500 <- clTotals[clTotals$ClusterSize %in% c(800, 1000, 1500),]
 
-png("Data/yeast_violin_PASS_genesPerCl2.png",
-  width = 5*300,        # 5 x 300 pixels
-  height = 5*300,
-  res = 300,            # 300 pixels per inch
-  pointsize = 8)        # smaller font size
 
-ggplot(clTotals, aes(x=ClNum, y=GeneTot, color=ClTot)) +
+pdf("Data/Violinplots_geneDistperCL.pdf")
+
+ggplot(cluster20_100, aes(x=ClusterSize, y=TotalGenes, fill=ClusterSize)) +
   geom_violin(trim=FALSE) + ylab("Total Number of Genes") +
-  xlab("Cluster Number") +
-  ggtitle("Total Number of Genes per Cluster") +
+  xlab("Cluster Size") +
+  ggtitle("Distibution of genes per cluster size (20 to 100)") +
   theme(plot.title = element_text(hjust = 0.5)) +
-  theme(legend.position="none")
+  geom_boxplot(width=0.1, fill="white") + theme_minimal() +
+  scale_fill_brewer(palette="Blues")
+  
+ggplot(cluster200_500, aes(x=ClusterSize, y=TotalGenes, fill=ClusterSize)) +
+  geom_violin(trim=FALSE) + ylab("Total Number of Genes") +
+  xlab("Cluster Size") +
+  ggtitle("Distibution of genes per cluster size (200 to 500)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_boxplot(width=0.1, fill="white") + theme_minimal() +
+  scale_fill_brewer(palette="Dark2")
+
+ggplot(cluster800_1500, aes(x=ClusterSize, y=TotalGenes, fill=ClusterSize)) +
+  geom_violin(trim=FALSE) + ylab("Total Number of Genes") +
+  xlab("Cluster Size") +
+  ggtitle("Distibution of genes per cluster size (800 to 1500)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+   geom_boxplot(width=0.1, fill="white") + theme_minimal() + 
+  scale_fill_brewer(palette="RdBu")
 
 dev.off()
+
+# -------
+# network topology
+
+
 
 ```
 
