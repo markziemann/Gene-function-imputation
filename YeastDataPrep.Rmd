@@ -174,16 +174,16 @@ dgeObj <- DGEList(agg)
 dgeObj <- calcNormFactors(dgeObj, method = "TMM") 
 tmm_agg <- cpm(dgeObj, log=TRUE)
 dim(tmm_agg)
-
 # Check distributions of samples
 hist(tmm_agg)
-
+saveRDS(tmm_agg,"tmm_agg.rds")
 
 #Z-SCORE SCALING
 s_agg <- scale(agg)
 dim(s_agg)
 # Check distributions of samples
 hist(s_agg)
+saveRDS(s_agg,"s_agg.rds")
 
 # Check ave correlation for each Normalisation method
 pdf("Data/Scaling.pdf") 
@@ -227,8 +227,6 @@ text(s_agg , labels=rownames(s_agg) ,cex=0.8)
 
 dev.off()
 
-colfunc <- colorRampPalette(c("blue", "white", "red"))
-
 ```
 
 ### 7. Heirarchical Clustering with PASS only databases
@@ -241,7 +239,7 @@ h_cluster <- function(counts,cutree_val,dist_met){
   h <- list()
   
   set.seed(42)
-  c<-as.dist(1-cor(t(counts), method=dist_met))
+  c<-as.dist(1-cor(t(counts), method="spearman"))
   hr <- hclust(c , method="complete")
   mycl <- cutree(hr, h=max(hr$height/cutree_val))
   mycl_length <- length(unique(mycl))
@@ -257,13 +255,11 @@ h_cluster <- function(counts,cutree_val,dist_met){
 # CLUSTERING
 
 s_aggCL_sp <- h_cluster(s_agg, 1.78, dist_met="spearman")
+  saveRDS(s_aggCL_sp,"s_aggCL_sp.rds")
 tmm_aggCL_sp <- h_cluster(tmm_agg, 1.621, dist_met= "spearman")
+  saveRDS(tmm_aggCL_sp,"tmm_aggCL_sp.rds")
 tmm_aggCL_pr <- h_cluster(tmm_agg, 1.72, dist_met= "pearson")
-
-# Save the clusters value 
-saveRDS(s_aggCL_sp[["mycl"]], "mycl_s_agg_sp.rds")
-saveRDS(tmm_aggCL_sp[["mycl"]], "mycl_tmm_agg_sp.rds")
-saveRDS(tmm_aggCL_pr[["mycl"]], "mycl_tmm_agg_pr.rds")
+  saveRDS(tmm_aggCL_pr,"tmm_aggCL_pr.rds")
 
 # Prepare Cluster data frame
 cl_data <- function(x1, x2) {
@@ -274,8 +270,7 @@ cl_data <- function(x1, x2) {
       clusters$GeneID <- rownames(clusters)
       nCL <- paste0(j, ".rds")
       nh <- paste0("mycl_",j,".rds")
-      saveRDS(clusters, as.character(nCL))
-      saveRDS(x, as.character(nh))
+      saveRDS(clusters, as.character(nh))
     }
   }
 }

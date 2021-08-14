@@ -38,15 +38,26 @@ source("functions.R")
 
 ### Load Pre-requisite RDS files 
 ```{r echo=TRUE}
-file_logcounts_PASS <- "logcounts_PASS.rds"
-file_clusters_SandC <- "clusters_SandC.rds"
+file_logcounts_PASS <- "tmm_agg.rds"
+file_scaled_PASS <- "s_agg.rds"
+file_cl_s <- "mycl_s_aggCL_sp.rds"
+file_cl_tmm_sp <- "mycl_tmm_aggCL_sp.rds"
+file_cl_tmm_pr <- "mycl_tmm_aggCL_pr.rds"
 file_GO <-"GO_table.rds"
 file_cuttree_values <- "cuttree_values.rds"
+file_hr_s <- "s_aggCL_sp.rds"
+file_hr_tmm_sp <- "tmm_aggCL_sp.rds"
+file_hr_tmm_pr <- "tmm_aggCL_pr.rds"
 
+s_agg <- readRDS(file_scaled_PASS)
 logcounts <- readRDS(file_logcounts_PASS)
-clusters <- readRDS(file_clusters_SandC)
+clusters_s <- readRDS(file_cl_s)
+clusters_tmm_sp <- readRDS(file_cl_tmm_sp)
+clusters_tmm_pr <- readRDS(file_cl_tmm_pr)
+HR_s <- readRDS(file_hr_s)
+HR_tmm_sp <- readRDS(file_hr_tmm_sp)
+HR_tmm_pr <- readRDS(file_hr_tmm_pr)
 GO_table <- readRDS(file_GO)
-cuttree_values <- readRDS(file_cuttree_values) 
 ```
 
 ### 1. Blinding known GO terms
@@ -73,13 +84,18 @@ GO_blinded[ind_blinded, 2:ncol(GO_blinded)] = 0
 
 ```
 
-### 2a. Impute using Spearman method to measure the distance matrix and complete as linkage method during the clustering process (This algorithm will be called SandC)
+### 2a. Determine min-max cut value through trial and error to get 20 to 2000 total clusters
 
 ```{r }
 
+cuttree_values_s <- cl_lengthCut(hr=HR_s[["hr"]], min=1.31, max=4.8, interval=0.001)
+saveRDS(cuttree_values_s, "cuttree_values_s.rds")
+  
+cuttree_values_tmm_pr <- cl_lengthCut(hr=HR_tmm_pr[["hr"]], min=1.2932, max=3.365, interval=0.001)
+saveRDS(cuttree_values_tmm_pr, "cuttree_values_tmm_pr.rds")
 
-
-sample2 <- kfold(cl_list, thresh_list, cuttree_values, logcounts, GO_table, GO_blinded)
+cuttree_values_tmm_sp <- cl_lengthCut(hr=HR_tmm_sp[["hr"]], min=1.2932, max=3.365, interval=0.001)
+saveRDS(cuttree_values_tmm_sp, "cuttree_values_tmm_sp.rds")
 
 ```
 </br>
@@ -94,7 +110,18 @@ The following code will perform a K-fold validation for the imputation process w
 cl_list <- c(20, 50, 100, 300, 500)
 thresh_list <- c(0.1, 0.4, 0.8)
 
-Coarse_sweep <- kfold(cl_list, thresh_list, cuttree_values, logcounts, GO_table, GO_blinded)
+# Scaled
+CS_s <- kfold(cl_list, thresh_list, cuttree_values_s, s_agg, GO_table, GO_blinded)
+    saveRDS(CS_s, "CS_s.rds")
+    
+# TMM Pearson
+CS_tmm_pr <- kfold(cl_list, thresh_list, cuttree_values_tmm_pr, logcounts, GO_table, GO_blinded)
+    saveRDS(CS_tmm_pr, "CS_tmm_pr.rds")
+    
+# TMM Spearman
+CS_tmm_sp <- kfold(cl_list, thresh_list, cuttree_values_tmm_sp, logcounts, GO_table, GO_blinded)
+    saveRDS(CS_tmm_sp, "CS_tmm_sp.rds")
+
 
 ```
 
@@ -102,33 +129,19 @@ Coarse_sweep <- kfold(cl_list, thresh_list, cuttree_values, logcounts, GO_table,
 
 ```{r}
 
-# Get the list of all the files for Pearson + complete linkage kfold validation
-files <- list.files(pattern ='^SandC.')
-# Get the list of all the SandC rds files sans extension
-files_names <- file_path_sans_ext(list.files(pattern ='^SandC.'))
-# Put all the dataframes in one list
-dat_list <- sapply(files,function (x) readRDS(x), simplify = FALSE, USE.NAMES = TRUE)
-# Change the names to get rid of the extension
-names(dat_list) <- files_names
-dat_list2 <- lapply(dat_list, function(x) x[names(x)!="Index_folds"])
-
-# Put all the F1 socres of each fold in one array
-F1_SandC <- sapply(dat_list2, function(x){
-  sapply(x, function(x) {x[length(x)]})
-}, simplify = "array", USE.NAMES = TRUE)
-
-# Transform the array into a dataframe 
-F1_SandC_list <- as.data.frame(F1_SandC)
-F1_SandC_df <- t(do.call(rbind, lapply(F1_SandC_list, data.frame, stringsAsFactors=FALSE)))
-# Get the mean for each column and append to the existing table
-Mean.F1_Score <- colMeans(F1_SandC_df)
-F1_SandC_df <- rbind(F1_SandC_df, Mean.F1_Score)
-rownames(F1_SandC_df)[rownames(F1_SandC_df) == "11"] <- "Mean.F1_Score"
-saveRDS(F1_SandC_df, "F1_SandC_df.rds")
+dat_list_s <- lapply(CS_s, function(x) x[names(x)!="Index_folds"])
+dat_list_tmm_pr <- lapply(CS_tmm_pr, function(x) x[names(x)!="Index_folds"])
+dat_list_tmm_sp <- lapply(CS_tmm_sp, function(x) x[names(x)!="Index_folds"])
 
 # List the all the mean predicton scores for each parameter 
-summary_all_SandC <- summary_Csweep(dat_list2)
-saveRDS(summary_all_SandC, "summary_all_SandC.rds")
+summary_all_s <- summary_Csweep(dat_list_s)
+saveRDS(summary_all_s, "summary_all_s.rds")
+
+summary_all_tmm_pr <- summary_Csweep(dat_list_tmm_pr)
+saveRDS(summary_all_tmm_pr, "summary_all_tmm_pr.rds")
+
+summary_all_tmm_sp <- summary_Csweep(dat_list_tmm_sp)
+saveRDS(summary_all_tmm_sp, "summary_all_tmm_sp.rds")
 
 
 ```
@@ -137,176 +150,86 @@ saveRDS(summary_all_SandC, "summary_all_SandC.rds")
 
 ```{r}
 
-# correlations of the counts (Pearson - default; Spearman)
-corr_logcounts <- cor(t(logcounts))
-saveRDS(corr_logcounts,"corr_logcounts.rds")
-
-corr_logcounts_spearman <- cor(t(logcounts), method = "spearman")
-saveRDS(corr_logcounts,"corr_logcounts_spearman.rds")
-
-# Get lower triangle of the correlation matrix
-corr_lowertri <- corr_logcounts
-corr_lowertri[upper.tri(corr_counts_lowertri)] <- NA
-
-# Melt the correlation matrix
- melted_cormat <- melt(corr_lowertri, na.rm = TRUE)
- melted_cormat <- melted_cormat[which(melted_cormat$Var1 != melted_cormat$Var2),]
- melted_cormat <- melted_cormat[which(melted_cormat$value != 1),]
- melted_cormat <- melted_cormat[order(-melted_cormat$value),]
-
-# Heatmap
-png("Data/yeast_heatmaps_PASS_corrlogcounts4.png",    # create PNG for the heat map
-  width = 5*300,        # 5 x 300 pixels
-  height = 5*300,
-  res = 300,            # 300 pixels per inch
-  pointsize = 8)        # smaller font size
-
-ggplot(data = melted_cormat[1:10000,], aes(Var2, Var1, fill = value))+
- geom_tile(color = "white")+
- scale_fill_gradient2(low = "blue", high = "red", mid = "white",
-   midpoint = 0, limit = c(-1,1), space = "Lab",
-   name="Pearson\nCorrelation") +
-  theme_minimal()+
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank()) +
- coord_fixed()
-
-dev.off()
-
-
-# creates a own color palette from red to green
-#my_palette <- colorRampPalette(c("yellow", "orange", "red"))
-my_palette <- colorRampPalette(c("red", "black", "green"))
-
-
-# (optional) defines the color breaks manually for a "skewed" color transition
-col_breaks = c(seq(-1,0,length=100), # for red
-seq(0.01,0.8,length=100),  # for yellow
-seq(0.81,1,length=100)) # for green
-
-start.time <- Sys.time()
-png("Data/yeast_heatmaps_PASS_corrlogcounts3.png",    # create PNG for the heat map
-  width = 5*300,        # 5 x 300 pixels
-  height = 5*300,
-  res = 300,            # 300 pixels per inch
-  pointsize = 8)        # smaller font size
-
-heatmap.2(melted_cormat[1:10000,],
-  main = "Correlation of Counts", # heat map title
-  margins =c(5,5),     # widens margins around plot
-  col=my_palette,       # use on color palette defined earlier
-  breaks=col_breaks,    # enable color transition at specified limits
-  trace="none",
-  dendrogram="both",     # only draw a row dendrogram
-  Rowv=T,
-  Colv=T,
-  symm=F,symkey=F,symbreaks=T, scale="none")
-
-
-dev.off()
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-
-
-# histogram - Pearson Method
-png("Data/yeast_histograms_PASS_corrlogcounts.png",    # create PNG for the heat map
-  width = 5*300,        # 5 x 300 pixels
-  height = 5*300,
-  res = 300,            # 300 pixels per inch
-  pointsize = 8)        # smaller font size
-
-hist(melted_cormat,
-     main="Correlation of Counts (Pearson Method)",
-     xlab="Normalised RNA Seq Counts")
-
-dev.off()
-
-# histogram - Spearman Method
-png("Data/yeast_histograms_PASS_corrlogcounts_spearman.png",
-  width = 5*300,        # 5 x 300 pixels
-  height = 5*300,
-  res = 300,            # 300 pixels per inch
-  pointsize = 8)        # smaller font size
-
-hist(corr_logcounts,
-     main="Correlation of Counts (Spearman Method)",
-     xlab="Normalised RNA Seq Counts")
-
-dev.off()
-
-
 # cut tree value vs Total Clusters – line diagram
-cuttree_totals_df <- as.data.frame(as.numeric(names(cuttree_values)))
-m <- list()
-for (i in 1:length(cuttree_values)){
-  x <- cuttree_values[[i]][["Cut_value"]]
-  m[[i]] <- x
+cuttree_totals_df <- function(cuttree_values, x){
+  as.data.frame(as.numeric(names(cuttree_values)))
+  m <- list()
+  for (i in 1:length(cuttree_values)){
+    x <- cuttree_values[[i]][["Cut_value"]]
+    m[[i]] <- x
+  }
+  cuttree_totals_df$CuttreeVal <- as.numeric(m)
+  colnames(cuttree_totals_df)[1] <- "ClTot"
+  n <- paste0("Data/", x, "cuttree_vs_clTotal.png")
+  png(as.character(n),
+    width = 5*300,        # 5 x 300 pixels
+    height = 5*300,
+    res = 300,            # 300 pixels per inch
+    pointsize = 8)        # smaller font size
+  
+  ggplot(cuttree_totals_df, aes(x=CuttreeVal, y=ClTot)) +
+    geom_line() + ylab("Total Number of Clusters") +
+    xlab("Cuttree Values") +
+    ggtitle("Cuttree Value vs Total Number of Clusters") +
+    theme(plot.title = element_text(hjust = 0.5))
+  
+  dev.off()
 }
-cuttree_totals_df$CuttreeVal <- as.numeric(m)
-colnames(cuttree_totals_df)[1] <- "ClTot"
 
-png("Data/yeast_line_PASS_cuttree_vs_clTotal.png",
-  width = 5*300,        # 5 x 300 pixels
-  height = 5*300,
-  res = 300,            # 300 pixels per inch
-  pointsize = 8)        # smaller font size
-
-ggplot(cuttree_totals_df, aes(x=CuttreeVal, y=ClTot)) +
-  geom_line() + ylab("Total Number of Clusters") +
-  xlab("Cuttree Values") +
-  ggtitle("Cuttree Value vs Total Number of Clusters") +
-  theme(plot.title = element_text(hjust = 0.5))
-
-dev.off()
+cuttree_totals_df(cuttree_values_s, x="cuttree_values_s")
+cuttree_totals_df(cuttree_values_tmm_pr, x="cuttree_values_tmm_pr") 
+cuttree_totals_df(cuttree_values_tmm_sp, x="cuttree_values_tmm_sp") 
+ 
 
 
 # Total genes per cluster  – violin plot
-clTotals <- do.call(rbind.data.frame, sapply(cuttree_values, "[[", 3))
-clTotals$ClusterSize <- as.factor(as.numeric(str_extract_all(rownames(clTotals), "^[:digit:]*(?=.)")))
-clTotals$ClusterID <- as.numeric(str_extract_all(rownames(clTotals), "(?=.)\\d+$"))
-colnames(clTotals)[1] <- "TotalGenes"
-rownames(clTotals) <- c()
-
-# Filter according to cluster size
-cluster20_100 <- clTotals[clTotals$ClusterSize %in% c(20,50,100),]
-cluster200_500 <- clTotals[clTotals$ClusterSize %in% c(200, 300, 500),]
-cluster800_1500 <- clTotals[clTotals$ClusterSize %in% c(800, 1000, 1500),]
-
-
-pdf("Data/Violinplots_geneDistperCL.pdf")
-
-ggplot(cluster20_100, aes(x=ClusterSize, y=TotalGenes, fill=ClusterSize)) +
-  geom_violin(trim=FALSE) + ylab("Total Number of Genes") +
-  xlab("Cluster Size") +
-  ggtitle("Distibution of genes per cluster size (20 to 100)") +
-  theme(plot.title = element_text(hjust = 0.5)) +
-  geom_boxplot(width=0.1, fill="white") + theme_minimal() +
-  scale_fill_brewer(palette="Blues")
+c_violin <- function(cuttree_values,x){
   
-ggplot(cluster200_500, aes(x=ClusterSize, y=TotalGenes, fill=ClusterSize)) +
-  geom_violin(trim=FALSE) + ylab("Total Number of Genes") +
-  xlab("Cluster Size") +
-  ggtitle("Distibution of genes per cluster size (200 to 500)") +
-  theme(plot.title = element_text(hjust = 0.5)) +
-  geom_boxplot(width=0.1, fill="white") + theme_minimal() +
-  scale_fill_brewer(palette="Dark2")
+  clTotals <- do.call(rbind.data.frame, sapply(cuttree_values, "[[", 3))
+  clTotals$ClusterSize <- as.factor(as.numeric(str_extract_all(rownames(clTotals), "^[:digit:]*(?=.)")))
+  clTotals$ClusterID <- as.numeric(str_extract_all(rownames(clTotals), "(?=.)\\d+$"))
+  colnames(clTotals)[1] <- "TotalGenes"
+  rownames(clTotals) <- c()
+  
+  # Filter according to cluster size
+  cluster20_100 <- clTotals[clTotals$ClusterSize %in% c(20,50,100),]
+  cluster200_500 <- clTotals[clTotals$ClusterSize %in% c(200, 300, 500),]
+  cluster800_1500 <- clTotals[clTotals$ClusterSize %in% c(800, 1000, 1500),]
+  
+  n <- paste0("Data/", x, "Violinplots.pdf")
+  
+  pdf(as.character(n))
+  
+  ggplot(cluster20_100, aes(x=ClusterSize, y=TotalGenes, fill=ClusterSize)) +
+    geom_violin(trim=FALSE) + ylab("Total Number of Genes") +
+    xlab("Cluster Size") +
+    ggtitle("Distibution of genes per cluster size (20 to 100)") +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    geom_boxplot(width=0.1, fill="white") + theme_minimal() +
+    scale_fill_brewer(palette="Blues")
+    
+  ggplot(cluster200_500, aes(x=ClusterSize, y=TotalGenes, fill=ClusterSize)) +
+    geom_violin(trim=FALSE) + ylab("Total Number of Genes") +
+    xlab("Cluster Size") +
+    ggtitle("Distibution of genes per cluster size (200 to 500)") +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    geom_boxplot(width=0.1, fill="white") + theme_minimal() +
+    scale_fill_brewer(palette="Dark2")
+  
+  ggplot(cluster800_1500, aes(x=ClusterSize, y=TotalGenes, fill=ClusterSize)) +
+    geom_violin(trim=FALSE) + ylab("Total Number of Genes") +
+    xlab("Cluster Size") +
+    ggtitle("Distibution of genes per cluster size (800 to 1500)") +
+    theme(plot.title = element_text(hjust = 0.5)) +
+     geom_boxplot(width=0.1, fill="white") + theme_minimal() + 
+    scale_fill_brewer(palette="RdBu")
+  
+  dev.off()
+}
 
-ggplot(cluster800_1500, aes(x=ClusterSize, y=TotalGenes, fill=ClusterSize)) +
-  geom_violin(trim=FALSE) + ylab("Total Number of Genes") +
-  xlab("Cluster Size") +
-  ggtitle("Distibution of genes per cluster size (800 to 1500)") +
-  theme(plot.title = element_text(hjust = 0.5)) +
-   geom_boxplot(width=0.1, fill="white") + theme_minimal() + 
-  scale_fill_brewer(palette="RdBu")
-
-dev.off()
-
-# -------
-# network topology
-
-
+c_violin(cuttree_values_s, x="cuttree_values_s") 
+c_violin(cuttree_values_tmm_pr, x="cuttree_values_tmm_pr") 
+c_violin(cuttree_values_tmm_sp, x="cuttree_values_tmm_sp") 
 
 ```
 
