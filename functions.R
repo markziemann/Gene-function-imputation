@@ -121,7 +121,10 @@ cl_lengthCut <- function(hr, min, max, interval){
   
   for (i in cut){
     
-    mycl <- cutree(hr, h=max(hr$height/i))
+    # for complete method
+    #mycl <- cutree(hr, h=max(hr$height/i))
+    #for ave linking method
+    mycl <- cutree(hr, k=i)
     mycl_length <- length(unique(mycl))
     
     # Prepare Cluster data frame
