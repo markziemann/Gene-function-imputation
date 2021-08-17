@@ -31,6 +31,9 @@ suppressPackageStartupMessages({
     library(networkD3)
     library(Polychrome)
     library(dendextend)
+    library(DESeq2)
+    library(ggplot2)
+    library(vsn)
 })
 
 source("functions.R")
@@ -163,11 +166,14 @@ hist(colSums(agg), breaks = 30)
 
 ### 6. Normalisation of Data (with PASS only databases)
 
-A CPM of 0.6 is used as it corresponds to a count of 10-15 for the library sizes in this data set. If the count is any smaller, it is considered to be very low, indicating that the associated gene is not expressed in that sample.As a general rule, a good threshold can be chosen by identifying the CPM that corresponds to a count of 10, which in this case is about 0.6.You should filter with CPMs rather than filtering on the counts directly, as the latter does not account for differences in library sizes between samples.
-
-Note: When in doubt, a threshold of 1 CPM in at least minimum group sample size is a good rule of thumb.
-
 ```{r eval=FALSE, include=FALSE}
+
+# Filtering low counts
+# Check if there are genes with no counts (rowSums==0)
+length(which(rowSums(agg) == 0)) # no rowSums = 0
+
+# Variance Stabilisation Transformation
+vsd <- vst(agg, blind = FALSE)
 
 #NORMALISATION FOR COMPOSITION BIAS (TMM normalisation)
 dgeObj <- DGEList(agg)
@@ -175,19 +181,45 @@ dgeObj <- DGEList(agg)
 dgeObj <- calcNormFactors(dgeObj, method = "TMM") 
 tmm_agg <- cpm(dgeObj)
 tmm_agg_s <- scale(tmm_agg)
+tmm_agg_log <- cpm(dgeObj, log = TRUE)
 # Check distributions of samples
 hist(tmm_agg_s)
 saveRDS(tmm_agg_s,"tmm_agg_s.rds")
+saveRDS(tmm_agg_log,"tmm_agg_log.rds")
+saveRDS(vsd,"vsd.rds")
+
+# Compare transformation methods
+pdf("Data/normalisations.pdf")
+plot(vsd, main = "vsd")
+plot(tmm_agg_s, main="TMM, Scaled")
+plot(tmm_agg_log, main="TMM, log2")
+plot(agg, main="Count Data")
+hist(vsd)
+hist(tmm_agg_s)
+hist(tmm_agg_log)
+hist(agg)
+meanSdPlot(vsd)
+meanSdPlot(tmm_agg_s)
+meanSdPlot(tmm_agg_log)
+meanSdPlot(agg)
+dev.off()
 
 
 # Check ave correlation for each Normalisation method
 pdf("Data/Scaling.pdf") 
 #calculate the row mean  
 avcor<-cor(rowMeans(tmm_agg_s),tmm_agg_s,method="pearson")
-hist(avcor,main="Pearson correlation to dataset average")
+hist(avcor,main="Pearson correlation to dataset average (TMM, Scaled)")
 mtext(paste("mean=",signif(mean(avcor),3)),cex=1.2)
 avcor<-cor(rowMeans(tmm_agg_s),tmm_agg_s,method="spearman")
-hist(avcor,main="Spearman correlation to dataset average")
+hist(avcor,main="Spearman correlation to dataset average (TMM, Scaled)")
+mtext(paste("mean=",signif(mean(avcor),3)),cex=1.2)
+
+avcor<-cor(rowMeans(tmm_agg_s),vsd,method="pearson")
+hist(avcor,main="Pearson correlation to dataset average (VSD)")
+mtext(paste("mean=",signif(mean(avcor),3)),cex=1.2)
+avcor<-cor(rowMeans(tmm_agg_s),vsd,method="spearman")
+hist(avcor,main="Spearman correlation to dataset average(VSD)")
 mtext(paste("mean=",signif(mean(avcor),3)),cex=1.2)
 dev.off()
 
@@ -196,38 +228,32 @@ dev.off()
 # deals with numerical distances, in which there is no 
 # measurement error (you have exactly one distance measure for 
 # each pair of items)
-mds_Sagg<-cmdscale(dist(t(tmm_agg_s)))
-saveRDS(mds_Sagg,"mds_Sagg.rds")
+mds_vsd<-cmdscale(dist(t(vsd)))
+saveRDS(mds_vsd,"mds_vsd.rds")
 
+# INCLUDE SCREE PLOT HERE!
 pdf("Data/MDS.pdf") 
 #nolabel
-plot(tmm_agg_s, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by gene: Scaled data", cex=0.6, pch=19) 
+plot(vsd, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by gene: Scaled data", cex=0.6, pch=19) 
 #label
-plot(tmm_agg_s, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by gene: Scaled data", cex=0.6, pch=19)
-text(tmm_agg_s , labels=rownames(tmm_agg_s) ,cex=0.8)
+plot(vsd, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by gene: Scaled data", cex=0.6, pch=19)
+text(vsd , labels=rownames(vsd) ,cex=0.8)
 dev.off()
 
 # Correlation Matrix
-corr <- cor(t(tmm_agg_s), method = "spearman")
+corr <- cor(t(vsd), method = "spearman")
 lt <- corr
 lt[upper.tri(lt,diag=TRUE)] <- NA
 
 lt_melt <- melt(lt, na.rm = TRUE)
 
-#
-png("Data/hist_corVals.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
-hist(lt, breaks = 20, xlab = "Gene Correlation Values", main = "Spearman Correlation of RNASeq Counts")
+png("Data/hist_vds.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+hist(lt, breaks = 30, xlab = "Gene Correlation Values", main = "Spearman Correlation of Variance Stabilised RNASeq Counts")
 dev.off()
-# number of Correlation values above 
-above_90 <- length(which(lt_melt$value >= 0.9)) # 1732358 (0.06985764)
-above_70 <- length(which(lt_melt$value >= 0.7)) # 3754967 (0.1514197)
-above_50 <- length(which(lt_melt$value >= 0.5)) # 6250630 (0.2520578)
-below_10 <- length(which(lt_melt$value <= 0.1 & lt_melt$value >0)) # 2221673 (0.08958936)
-below_0 <-  length(which(lt_melt$value <= 0)) # 8984905 (0.3623179)
+
 # Check for 0 values
 length(which(lt_melt$value ==0 )) # no zero values
-# Check total number of unique correlation values
-length(which(lt_melt$value != 0)) # 24798403
+
 
 ```
 
@@ -236,7 +262,7 @@ length(which(lt_melt$value != 0)) # 24798403
 ```{r echo=TRUE}
 set.seed(42)
 
-c2<-as.dist(1-cor(t(tmm_agg_s), method="spearman"))
+c2<-as.dist(1-cor(t(vsd), method="spearman"))
 
 hr <- hclust(c2 , method="average")
 hr2 <- hclust(c2 , method="complete")
@@ -285,10 +311,6 @@ plot(avg_dend_obj6, main = paste0("Ward Method: Corr = ", signif(l[[6]])))
 dev.off()
 
 
-
-
-
-
 ```
 
 ### 7. Heirarchical Clustering with PASS only databases
@@ -298,15 +320,15 @@ This chunk can be reused for the PASS + Warn or the WARN filters by changing the
 ```{r echo=TRUE}
 
   set.seed(42)
-  c<-as.dist(1-cor(t(tmm_agg_s), method="spearman"))
+  c<-as.dist(1-cor(t(vsd), method="spearman"))
   hr <- hclust(c , method="average")
   mycl <- cutree(hr, k=4)
   mycl_length <- length(unique(mycl))
   mycl_length
   clusters <- as.data.frame(mycl)
-      colnames(clusters) <- "ClusterNumber"
-      clusters$GeneID <- rownames(clusters)
-      saveRDS(clusters, "clusters.rds")
+  colnames(clusters) <- "ClusterNumber"
+  clusters$GeneID <- rownames(clusters)
+  saveRDS(clusters, "clusters.rds")
 
 ```
 
