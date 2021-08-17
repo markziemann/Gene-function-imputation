@@ -30,6 +30,7 @@ suppressPackageStartupMessages({
     library (igraph)
     library(networkD3)
     library(Polychrome)
+    library(dendextend)
 })
 
 source("functions.R")
@@ -172,36 +173,22 @@ Note: When in doubt, a threshold of 1 CPM in at least minimum group sample size 
 dgeObj <- DGEList(agg)
 # Apply TMM normalisation to DGEList object
 dgeObj <- calcNormFactors(dgeObj, method = "TMM") 
-tmm_agg <- cpm(dgeObj, log=TRUE)
-dim(tmm_agg)
+tmm_agg <- cpm(dgeObj)
+tmm_agg_s <- scale(tmm_agg)
 # Check distributions of samples
-hist(tmm_agg)
-saveRDS(tmm_agg,"tmm_agg.rds")
+hist(tmm_agg_s)
+saveRDS(tmm_agg_s,"tmm_agg_s.rds")
 
-#Z-SCORE SCALING
-s_agg <- scale(agg)
-dim(s_agg)
-# Check distributions of samples
-hist(s_agg)
-saveRDS(s_agg,"s_agg.rds")
 
 # Check ave correlation for each Normalisation method
 pdf("Data/Scaling.pdf") 
 #calculate the row mean  
-avcor<-cor(rowMeans(s_agg),s_agg,method="pearson")
-hist(avcor,main="Pearson correlation to dataset average: Scaled data")
+avcor<-cor(rowMeans(tmm_agg_s),tmm_agg_s,method="pearson")
+hist(avcor,main="Pearson correlation to dataset average")
 mtext(paste("mean=",signif(mean(avcor),3)),cex=1.2)
-avcor<-cor(rowMeans(s_agg),s_agg,method="spearman")
-hist(avcor,main="Spearman correlation to dataset average: Scaled data")
+avcor<-cor(rowMeans(tmm_agg_s),tmm_agg_s,method="spearman")
+hist(avcor,main="Spearman correlation to dataset average")
 mtext(paste("mean=",signif(mean(avcor),3)),cex=1.2)
-
-avcor<-cor(rowMeans(tmm_agg),tmm_agg,method="pearson")
-hist(avcor,main="Pearson correlation to dataset average: TMM Normalised data")
-mtext(paste("mean=",signif(mean(avcor),3)),cex=1.2)
-avcor<-cor(rowMeans(tmm_agg),tmm_agg,method="spearman")
-hist(avcor,main="Spearman correlation to dataset average: TMM Normalised data")
-mtext(paste("mean=",signif(mean(avcor),3)),cex=1.2)
-
 dev.off()
 
 
@@ -209,23 +196,98 @@ dev.off()
 # deals with numerical distances, in which there is no 
 # measurement error (you have exactly one distance measure for 
 # each pair of items)
-mds_Sagg<-cmdscale(dist(t(s_agg)))
-mds_TMMagg<-cmdscale(dist(t(tmm_agg)))
+mds_Sagg<-cmdscale(dist(t(tmm_agg_s)))
+saveRDS(mds_Sagg,"mds_Sagg.rds")
 
 pdf("Data/MDS.pdf") 
-#noabel
-plot(tmm_agg, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by gene: TMM Normalised data", cex=0.6, pch=19)
-#labeled
-plot(tmm_agg, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by gene: TMM Normalised data", cex=0.6, pch=19)
-text( tmm_agg , labels=rownames(tmm_agg) ,cex=0.8) 
-
 #nolabel
-plot(s_agg, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by gene: Scaled data", cex=0.6, pch=19) 
+plot(tmm_agg_s, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by gene: Scaled data", cex=0.6, pch=19) 
 #label
-plot(s_agg, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by gene: Scaled data", cex=0.6, pch=19)
-text(s_agg , labels=rownames(s_agg) ,cex=0.8)
+plot(tmm_agg_s, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by gene: Scaled data", cex=0.6, pch=19)
+text(tmm_agg_s , labels=rownames(tmm_agg_s) ,cex=0.8)
+dev.off()
+
+# Correlation Matrix
+corr <- cor(t(tmm_agg_s), method = "spearman")
+lt <- corr
+lt[upper.tri(lt,diag=TRUE)] <- NA
+
+lt_melt <- melt(lt, na.rm = TRUE)
+
+#
+png("Data/hist_corVals.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+hist(lt, breaks = 20, xlab = "Gene Correlation Values", main = "Spearman Correlation of RNASeq Counts")
+dev.off()
+# number of Correlation values above 
+above_90 <- length(which(lt_melt$value >= 0.9)) # 1732358 (0.06985764)
+above_70 <- length(which(lt_melt$value >= 0.7)) # 3754967 (0.1514197)
+above_50 <- length(which(lt_melt$value >= 0.5)) # 6250630 (0.2520578)
+below_10 <- length(which(lt_melt$value <= 0.1 & lt_melt$value >0)) # 2221673 (0.08958936)
+below_0 <-  length(which(lt_melt$value <= 0)) # 8984905 (0.3623179)
+# Check for 0 values
+length(which(lt_melt$value ==0 )) # no zero values
+# Check total number of unique correlation values
+length(which(lt_melt$value != 0)) # 24798403
+
+```
+
+### Unsupervised Clustering
+
+```{r echo=TRUE}
+set.seed(42)
+
+c2<-as.dist(1-cor(t(tmm_agg_s), method="spearman"))
+
+hr <- hclust(c2 , method="average")
+hr2 <- hclust(c2 , method="complete")
+hr3 <- hclust(c2 , method="single")
+hr4 <- hclust(c2 , method="median")
+hr5 <- hclust(c2 , method="centroid")
+hr6 <- hclust(c2 , method="ward.D2")
+
+x <- list(hr, hr2, hr3, hr4, hr5, hr6)
+y <- c("Average", "Complete", "Single", "Median", "Centroid", "Ward")
+
+l <- list()
+counter = 1
+for (h in x){
+    cophenetic.d = cophenetic(h)
+    test <- cor(c2,cophenetic.d)
+    l[[paste0(y[counter], "_Method")]] <- test
+    counter = counter +1
+}
+
+pdf("Data/dendro_s_agg.pdf")
+avg_dend_obj <- as.dendrogram(hr)
+labels_colors(avg_dend_obj) <- "white"
+plot(avg_dend_obj, main = paste0("Average Method: Corr = ", signif(l[[1]])))
+
+avg_dend_obj2 <- as.dendrogram(hr2)
+labels_colors(avg_dend_obj2) <- "white"
+plot(avg_dend_obj2, main = paste0("Complete Method: Corr = ", signif(l[[2]])))
+
+avg_dend_obj3 <- as.dendrogram(hr3)
+labels_colors(avg_dend_obj3) <- "white"
+plot(avg_dend_obj3, main = paste0("Single Method: Corr = ", signif(l[[3]])))
+
+avg_dend_obj4 <- as.dendrogram(hr4)
+labels_colors(avg_dend_obj4) <- "white"
+plot(avg_dend_obj4, main = paste0("Median Method: Corr = ", signif(l[[4]])))
+
+avg_dend_obj5 <- as.dendrogram(hr5)
+labels_colors(avg_dend_obj5) <- "white"
+plot(avg_dend_obj5, main = paste0("Centroild Method: Corr = ", signif(l[[5]])))
+
+avg_dend_obj6 <- as.dendrogram(hr6)
+labels_colors(avg_dend_obj6) <- "white"
+plot(avg_dend_obj6, main = paste0("Ward Method: Corr = ", signif(l[[6]])))
 
 dev.off()
+
+
+
+
+
 
 ```
 
@@ -235,49 +297,16 @@ This chunk can be reused for the PASS + Warn or the WARN filters by changing the
 
 ```{r echo=TRUE}
 
-h_cluster <- function(counts,cutree_val,dist_met){
-  h <- list()
-  
   set.seed(42)
-  c<-as.dist(1-cor(t(counts), method="spearman"))
-  hr <- hclust(c , method="complete")
-  mycl <- cutree(hr, h=max(hr$height/cutree_val))
+  c<-as.dist(1-cor(t(tmm_agg_s), method="spearman"))
+  hr <- hclust(c , method="average")
+  mycl <- cutree(hr, k=4)
   mycl_length <- length(unique(mycl))
-  
-  h[["hr"]] <- hr
-  h[["mycl"]] <- mycl
-  h[["mycl_length"]] <- mycl_length
-  
-  return(h)
-}
-
-#-----
-# CLUSTERING
-
-s_aggCL_sp <- h_cluster(s_agg, 1.78, dist_met="spearman")
-  saveRDS(s_aggCL_sp,"s_aggCL_sp.rds")
-tmm_aggCL_sp <- h_cluster(tmm_agg, 1.621, dist_met= "spearman")
-  saveRDS(tmm_aggCL_sp,"tmm_aggCL_sp.rds")
-tmm_aggCL_pr <- h_cluster(tmm_agg, 1.72, dist_met= "pearson")
-  saveRDS(tmm_aggCL_pr,"tmm_aggCL_pr.rds")
-
-# Prepare Cluster data frame
-cl_data <- function(x1, x2) {
-  for (i in x1){
-    for (j in x2){
-      clusters <- as.data.frame(x1[["mycl"]])
+  mycl_length
+  clusters <- as.data.frame(mycl)
       colnames(clusters) <- "ClusterNumber"
       clusters$GeneID <- rownames(clusters)
-      nCL <- paste0(j, ".rds")
-      nh <- paste0("mycl_",j,".rds")
-      saveRDS(clusters, as.character(nh))
-    }
-  }
-}
-
-x1 <- c(s_aggCL_sp, tmm_aggCL_sp, tmm_aggCL_pr)
-x2 <- c("s_aggCL_sp", "tmm_aggCL_sp", "tmm_aggCL_pr")
-cl_data(x1, x2)
+      saveRDS(clusters, "clusters.rds")
 
 ```
 
@@ -292,25 +321,9 @@ clusterCols <- P100[1:100]
 colfunc <- colorRampPalette(c("blue", "white", "red"))
 
 # Heatmaps TMM
-
 png("Data/hm_TMM_sp.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
 myClusterSideBar <- clusterCols[tmm_aggCL_sp[["mycl"]]]
-heatmap.2(cl_corr, main="Gene Correlation (TMM, Spearman)",  Rowv=as.dendrogram(hr),
-          dendrogram="both", scale="col", col = colfunc(25), trace="none",
-          RowSideColors= myClusterSideBar, margins = c(5,5))
-dev.off()
-
-png("Data/hm_TMM_pr.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
-myClusterSideBar <- clusterCols[tmm_aggCL_pr[["mycl"]]]
-heatmap.2(cl_corr, main="Gene Correlation (TMM, Pearson)",  Rowv=as.dendrogram(hr),
-          dendrogram="both", scale="col", col = colfunc(25), trace="none",
-          RowSideColors= myClusterSideBar, margins = c(5,5))
-dev.off()
-
-# Heatmaps Scaled
-png("Data/hm_scaled_sp.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
-myClusterSideBar <- clusterCols[s_aggCL_sp[["mycl"]]]
-heatmap.2(cl_corr, main="Gene Correlation (Scaled)",  Rowv=as.dendrogram(hr),
+heatmap.2(corr, main="Gene Correlation (TMM, Spearman)",  Rowv=as.dendrogram(hr),
           dendrogram="both", scale="col", col = colfunc(25), trace="none",
           RowSideColors= myClusterSideBar, margins = c(5,5))
 dev.off()
@@ -371,138 +384,9 @@ saveRDS(GO_table, "GO_table.rds")
 
 ```
 
-### 10. Topographical Analysis
-
-```{r eval=FALSE, include=FALSE}
-
-
-# Create a graph adjacency based on correlation distances between genes in  pairwise fashion.
-g <- graph.adjacency(
-  as.matrix(as.dist(1-cor(t(s_agg), method="spearman"))),
-  mode="undirected",
-  weighted=TRUE,
-  diag=FALSE
-)
-
-# Simplfy the adjacency object
-g <- simplify(g, remove.multiple=TRUE, remove.loops=TRUE)
-
-# Colour negative correlation edges as blue
-E(g)[which(E(g)$weight<0)]$color <- "darkblue"
-
-# Colour positive correlation edges as red
-E(g)[which(E(g)$weight>0)]$color <- "darkred"
-
-# Convert edge weights to absolute values
-E(g)$weight <- abs(E(g)$weight)
-
-# Change arrow size
-# For directed graphs only
-#E(g)$arrow.size <- 1.0
-
-# Remove edges below absolute Pearson correlation 0.8
-g <- delete_edges(g, E(g)[which(E(g)$weight<0.8)])
-
-# Remove any vertices remaining that have no edges
-g <- delete.vertices(g, degree(g)==0)
-
-# Assign names to the graph vertices (optional)
-#V(g)$name <- V(g)$name
-
-# Change shape of graph vertices
-V(g)$shape <- "sphere"
-
-# Change colour of graph vertices
-V(g)$color <- "skyblue"
-
-# Change colour of vertex frames
-V(g)$vertex.frame.color <- "white"
-
-# Scale the size of the vertices to be proportional to the level of expression of each gene represented by each vertex
-# Multiply scaled vales by a factor of 10
-#scale01 <- function(x){(x-min(x))/(max(x)-min(x))}
-#vSizes <- (scale01(apply(s_agg, 1, mean)) + 1.0) * 10
-
-# Amplify or decrease the width of the edges
-#edgeweights <- E(g)$weight * 2.0
-
-# Convert the graph adjacency object into a minimum spanning tree based on Prim's algorithm
-mst <- mst(g, algorithm="prim")
-
-# Plot the tree object
-png("Data/igraph_scaled_agg.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
-plot(
-  g,
-  layout=layout.fruchterman.reingold,
-  edge.curved=TRUE,
-  vertex.size=vSizes,
-  vertex.label.dist=-0.5,
-  vertex.label.color="black",
-  asp=FALSE,
-  vertex.label.cex=0.6,
-  edge.width=edgeweights,
-  edge.arrow.mode=0,
-  main="Yeast Gene Correlation Network")
-dev.off()
-
-
-#------
-# Topological Analysis for GO network
-
-GO_net <- readRDS("GO_table.rds")
-rownames(GO_net) <- GO_net$GeneID
-GO_net <- GO_net[,-1]
-
-GO2 <- GO_net[1:100, 1:50]
-
-links2 <- GO2[rowSums(GO2)>0,]
-nodes2 <- rownames(links2)
-nodes2 <- colnames(links2)
-
-net2 <- graph_from_incidence_matrix(links2)
-net2 <- simplify(net2, remove.multiple=TRUE, remove.loops=TRUE)
-net2.bp <- bipartite.projection(net2)
-
-
-png("Data/igraph_GO.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
-plot(net2.bp$proj1,layout = l, vertex.label.color="black", vertex.label.dist=2,
-     vertex.size=7, vertex.label="")
-dev.off()
-
-set.seed(42) 
-l <- layout.fruchterman.reingold(net2, niter=50)
-l2 <- layout.lgl(net2)
-l3 <- layout_with_graphopt(net2.bp$proj1, charge=0.00001)
-
-l <- layout_nicely(net2, dim=2)
-
-plot(net2.bp$proj1, layout = l2,
-     vertex.label.dist=1,
-     #edge.curved = TRUE,
-     edge.arrow.size=0.5, 
-     vertex.label.cex=0.5, 
-     vertex.label.family="Helvetica",
-     vertex.label.font=2,
-     vertex.shape="circle", 
-     vertex.size=2, 
-     vertex.label.color="black", 
-     edge.width=0.2,
-     vertex.label="")
-
-
-p <- simpleNetwork(links2, height="100px", width="100px")
-
-p
-
-# save the widget
-# library(htmlwidgets)
-# saveWidget(p, file=paste0( getwd(), "/HtmlWidget/networkInteractive1.html"))
-
-```
-
 ### 10. Data preparation functions
 
-```{r echo=TRUE}
+```{r eval=FALSE, include=FALSE}
 
 # A nested list with of the genes grouped per cluster and their 
 # corresponding correlation values. 

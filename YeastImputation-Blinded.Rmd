@@ -38,8 +38,7 @@ source("functions.R")
 
 ### Load Pre-requisite RDS files 
 ```{r echo=TRUE}
-file_logcounts_PASS <- "tmm_agg.rds"
-file_scaled_PASS <- "s_agg.rds"
+file_PASS <- "tmm_agg_s.rds"
 file_cl_s <- "mycl_s_aggCL_sp.rds"
 file_cl_tmm_sp <- "mycl_tmm_aggCL_sp.rds"
 file_cl_tmm_pr <- "mycl_tmm_aggCL_pr.rds"
@@ -49,8 +48,8 @@ file_hr_s <- "s_aggCL_sp.rds"
 file_hr_tmm_sp <- "tmm_aggCL_sp.rds"
 file_hr_tmm_pr <- "tmm_aggCL_pr.rds"
 
-s_agg <- readRDS(file_scaled_PASS)
-logcounts <- readRDS(file_logcounts_PASS)
+tmm_agg_s <- readRDS(file_PASS)
+
 clusters_s <- readRDS(file_cl_s)
 clusters_tmm_sp <- readRDS(file_cl_tmm_sp)
 clusters_tmm_pr <- readRDS(file_cl_tmm_pr)
@@ -88,14 +87,11 @@ GO_blinded[ind_blinded, 2:ncol(GO_blinded)] = 0
 
 ```{r }
 
-cuttree_values_s <- cl_lengthCut(hr=HR_s[["hr"]], min=1.31, max=4.8, interval=0.001)
-saveRDS(cuttree_values_s, "cuttree_values_s.rds")
-  
-cuttree_values_tmm_pr <- cl_lengthCut(hr=HR_tmm_pr[["hr"]], min=1.2932, max=3.365, interval=0.001)
-saveRDS(cuttree_values_tmm_pr, "cuttree_values_tmm_pr.rds")
+cuttree_values_ave <- cl_lengthCut(hr=hr, min=4, max=2000, interval=2)
+saveRDS(cuttree_values_ave, "cuttree_values_aves.rds")
 
-cuttree_values_tmm_sp <- cl_lengthCut(hr=HR_tmm_sp[["hr"]], min=1.2932, max=3.365, interval=0.001)
-saveRDS(cuttree_values_tmm_sp, "cuttree_values_tmm_sp.rds")
+# cuttree_values_s <- cl_lengthCut(hr=hr, min=1.31, max=4.8, interval=0.001)
+# saveRDS(cuttree_values_s, "cuttree_values.rds")
 
 ```
 </br>
@@ -111,17 +107,9 @@ cl_list <- c(20, 50, 100, 300, 500)
 thresh_list <- c(0.1, 0.4, 0.8)
 
 # Scaled
-CS_s <- kfold(cl_list, thresh_list, cuttree_values_s, s_agg, GO_table, GO_blinded)
+CS_s <- kfold(cl_list, thresh_list, cuttree_values_ave, tmm_agg_s, GO_table, GO_blinded)
     saveRDS(CS_s, "CS_s.rds")
     
-# TMM Pearson
-CS_tmm_pr <- kfold(cl_list, thresh_list, cuttree_values_tmm_pr, logcounts, GO_table, GO_blinded)
-    saveRDS(CS_tmm_pr, "CS_tmm_pr.rds")
-    
-# TMM Spearman
-CS_tmm_sp <- kfold(cl_list, thresh_list, cuttree_values_tmm_sp, logcounts, GO_table, GO_blinded)
-    saveRDS(CS_tmm_sp, "CS_tmm_sp.rds")
-
 
 ```
 

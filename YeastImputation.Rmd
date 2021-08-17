@@ -38,9 +38,9 @@ source("functions.R")
 
 ```{r , loadrds}
 
-file_logcounts_PASS <- "logcounts_PASS.rds"
+file_logcounts_PASS <- "tmm_agg.rds"
 file_agg <- "agg.rds"
-file_clusters_SandC <- "clusters_SandC.rds"
+file_clusters <- "clusters_SandC.rds"
 file_GO <-"GO_table.rds"
 file_GO_allClusters <- "GOterms_allClusters.rds"
 file_corr_allClusters <- "corr_allClusters.rds"
@@ -49,7 +49,7 @@ file_hr_SandC <- "hr_PASS_SandC.rds"
 
 logcounts <- readRDS(file_logcounts_PASS)
 agg <- readRDS(file_agg)
-clusters <- readRDS(file_clusters_SandC)
+clusters <- readRDS(file_clusters)
 GO_table <- readRDS(file_GO)
 GO_allClusters <-  readRDS(file_GO_allClusters)
 corr_allClusters <-  readRDS(file_corr_allClusters)
