@@ -1,0 +1,120 @@
+---
+title: "Example Heatmap"
+author: "Mark Ziemann"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    fig_width: 7
+    fig_height: 5
+theme: cosmo
+---
+
+
+## Intro
+
+This Rmarkdown is designed to show what a heatmap will look like.
+
+```{r,libs1}
+
+library("gplots")
+library("RColorBrewer")
+
+library("gridGraphics")
+library("grid")
+
+```
+
+## Make some data
+
+Generating random data
+
+
+```{r,data1}
+
+precision <- matrix(rnorm(n=25,mean=0.8,sd=0.05),nrow = 5)
+colnames(precision) <- c("c0.75","c0.80","c0.85","c0.90","c0.95")
+rownames(precision) <- c("s500","s200","s100","s50","s25")
+
+recall <- matrix(rnorm(n=25,mean=0.8,sd=0.05),nrow = 5)
+colnames(recall) <- c("c0.75","c0.80","c0.85","c0.90","c0.95")
+rownames(recall) <- c("s500","s200","s100","s50","s25")
+
+
+f1 <- 2* (precision * recall) / (precision + recall)
+
+f1
+```
+
+## Make heatmaps
+
+par(mfrow=c(3,1)) doesn't work for heatmap.2 for some reason.
+
+```{r,heat}
+
+colfunc <- colorRampPalette(c("blue", "white", "red"))
+
+heatmap.2(precision, main="Precision", Colv = "None", Rowv = "None", dendrogram = "none",
+          scale="none", col = colfunc(25), trace="none", margins = c(5,4))
+
+heatmap.2(recall, main="Recall", Colv = "None", Rowv = "None", dendrogram = "none",
+          scale="none", col = colfunc(25), trace="none", margins = c(5,4))
+
+heatmap.2(f1, main="F1", Colv = "None", Rowv = "None", dendrogram = "none",
+          scale="none", col = colfunc(25), trace="none", margins = c(5,4))
+
+```
+
+## Multi heatmap
+
+```{r,multi1,fig.height=18,fig.width=6}
+
+grab_grob <- function(){
+  grid.echo()
+  grid.grab()
+}
+
+heatmap.2(precision, main="Precision", Colv = "None", Rowv = "None", dendrogram = "none",
+          scale="none", col = colfunc(25), trace="none", margins = c(14,4))
+text(x = 0.5, y=0.8,"Precision",cex=2)
+
+p <- grab_grob()
+
+grid.newpage()
+
+heatmap.2(recall, main="Recall", Colv = "None", Rowv = "None", dendrogram = "none",
+          scale="none", col = colfunc(25), trace="none", margins = c(14,4))
+text(x = 0.5, y=0.8,"Recall",cex=2)
+
+r <- grab_grob()
+
+grid.newpage()
+
+heatmap.2(f1, Colv = "None", Rowv = "None", dendrogram = "none",
+          scale="none", col = colfunc(25), trace="none", margins = c(14,4))
+text(x = 0.5, y=0.8,"F1",cex=2)
+
+f <- grab_grob()
+
+grid.newpage()
+
+lay <- grid.layout(nrow = 3, ncol=1)
+pushViewport(viewport(layout = lay))
+grid.draw(editGrob(p, vp=viewport(layout.pos.row = 1, 
+                                  layout.pos.col = 1, clip=TRUE)))
+grid.draw(editGrob(r, vp=viewport(layout.pos.row = 2, 
+                                  layout.pos.col = 1, clip=TRUE)))
+grid.draw(editGrob(f, vp=viewport(layout.pos.row = 3, 
+                                  layout.pos.col = 1, clip=TRUE)))
+upViewport(1)
+
+```
+
+## Session information
+
+```{r,session}
+
+sessionInfo()
+
+```
