@@ -27,13 +27,10 @@ suppressPackageStartupMessages({
     library(gplots)
     library(edgeR)
     library(reshape2)
-    library (igraph)
-    library(networkD3)
     library(Polychrome)
     library(dendextend)
-    library(DESeq2)
     library(ggplot2)
-    library(vsn)
+    library(DESeq2)
 })
 
 source("functions.R")
@@ -160,95 +157,40 @@ agg <- agg[!(rownames(agg) %in% no_gene_counts),]
 saveRDS(agg, "agg.rds")
 
 # Histogram showing samples (columns) counts
-hist(colSums(agg), breaks = 30)
+hist(colSums(agg), breaks = 20)
 
 ```
 
 ### 6. Normalisation of Data (with PASS only databases)
 
-```{r eval=FALSE, include=FALSE}
+```{r echo=TRUE}
 
 # Filtering low counts
 # Check if there are genes with no counts (rowSums==0)
 length(which(rowSums(agg) == 0)) # no rowSums = 0
-
-# Variance Stabilisation Transformation
-vsd <- vst(agg, blind = FALSE)
 
 #NORMALISATION FOR COMPOSITION BIAS (TMM normalisation)
 dgeObj <- DGEList(agg)
 # Apply TMM normalisation to DGEList object
 dgeObj <- calcNormFactors(dgeObj, method = "TMM") 
 tmm_agg <- cpm(dgeObj)
+
+# Scale after normalisation
 tmm_agg_s <- scale(tmm_agg)
-tmm_agg_log <- cpm(dgeObj, log = TRUE)
+
 # Check distributions of samples
 hist(tmm_agg_s)
 saveRDS(tmm_agg_s,"tmm_agg_s.rds")
-saveRDS(tmm_agg_log,"tmm_agg_log.rds")
-saveRDS(vsd,"vsd.rds")
-
-# Compare transformation methods
-pdf("Data/normalisations.pdf")
-plot(vsd, main = "vsd")
-plot(tmm_agg_s, main="TMM, Scaled")
-plot(tmm_agg_log, main="TMM, log2")
-plot(agg, main="Count Data")
-hist(vsd)
-hist(tmm_agg_s)
-hist(tmm_agg_log)
-hist(agg)
-meanSdPlot(vsd)
-meanSdPlot(tmm_agg_s)
-meanSdPlot(tmm_agg_log)
-meanSdPlot(agg)
-dev.off()
-
-
-# Check ave correlation for each Normalisation method
-pdf("Data/Scaling.pdf") 
-#calculate the row mean  
-avcor<-cor(rowMeans(tmm_agg_s),tmm_agg_s,method="pearson")
-hist(avcor,main="Pearson correlation to dataset average (TMM, Scaled)")
-mtext(paste("mean=",signif(mean(avcor),3)),cex=1.2)
-avcor<-cor(rowMeans(tmm_agg_s),tmm_agg_s,method="spearman")
-hist(avcor,main="Spearman correlation to dataset average (TMM, Scaled)")
-mtext(paste("mean=",signif(mean(avcor),3)),cex=1.2)
-
-avcor<-cor(rowMeans(tmm_agg_s),vsd,method="pearson")
-hist(avcor,main="Pearson correlation to dataset average (VSD)")
-mtext(paste("mean=",signif(mean(avcor),3)),cex=1.2)
-avcor<-cor(rowMeans(tmm_agg_s),vsd,method="spearman")
-hist(avcor,main="Spearman correlation to dataset average(VSD)")
-mtext(paste("mean=",signif(mean(avcor),3)),cex=1.2)
-dev.off()
-
-
-# Multi-dimensional Scaling - Torgerson method:
-# deals with numerical distances, in which there is no 
-# measurement error (you have exactly one distance measure for 
-# each pair of items)
-mds_vsd<-cmdscale(dist(t(vsd)))
-saveRDS(mds_vsd,"mds_vsd.rds")
-
-# INCLUDE SCREE PLOT HERE!
-pdf("Data/MDS.pdf") 
-#nolabel
-plot(vsd, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by gene: Scaled data", cex=0.6, pch=19) 
-#label
-plot(vsd, xlab="Coordinate 1", ylab="Coordinate 2", main="MDS by gene: Scaled data", cex=0.6, pch=19)
-text(vsd , labels=rownames(vsd) ,cex=0.8)
-dev.off()
 
 # Correlation Matrix
-corr <- cor(t(vsd), method = "spearman")
+corr <- cor(t(tmm_agg_s), method = "spearman")
 lt <- corr
 lt[upper.tri(lt,diag=TRUE)] <- NA
 
 lt_melt <- melt(lt, na.rm = TRUE)
 
 png("Data/hist_vds.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
-hist(lt, breaks = 30, xlab = "Gene Correlation Values", main = "Spearman Correlation of Variance Stabilised RNASeq Counts")
+hist(lt, breaks = 20, xlab = "Gene Correlation Values", main = "Spearman Correlation of RNASeq Counts")
 dev.off()
 
 # Check for 0 values
@@ -262,52 +204,16 @@ length(which(lt_melt$value ==0 )) # no zero values
 ```{r echo=TRUE}
 set.seed(42)
 
-c2<-as.dist(1-cor(t(vsd), method="spearman"))
+cl <-as.dist(1-cor(t(tmm_agg_s), method="spearman"))
 
-hr <- hclust(c2 , method="average")
-hr2 <- hclust(c2 , method="complete")
-hr3 <- hclust(c2 , method="single")
-hr4 <- hclust(c2 , method="median")
-hr5 <- hclust(c2 , method="centroid")
-hr6 <- hclust(c2 , method="ward.D2")
+hr <- hclust(cl , method="ward.D2")
+cophenetic.d = cophenetic(hr)
+corr_cophVSdist <- cor(corr, cophenetic.d)
 
-x <- list(hr, hr2, hr3, hr4, hr5, hr6)
-y <- c("Average", "Complete", "Single", "Median", "Centroid", "Ward")
-
-l <- list()
-counter = 1
-for (h in x){
-    cophenetic.d = cophenetic(h)
-    test <- cor(c2,cophenetic.d)
-    l[[paste0(y[counter], "_Method")]] <- test
-    counter = counter +1
-}
-
-pdf("Data/dendro_s_agg.pdf")
-avg_dend_obj <- as.dendrogram(hr)
-labels_colors(avg_dend_obj) <- "white"
-plot(avg_dend_obj, main = paste0("Average Method: Corr = ", signif(l[[1]])))
-
-avg_dend_obj2 <- as.dendrogram(hr2)
-labels_colors(avg_dend_obj2) <- "white"
-plot(avg_dend_obj2, main = paste0("Complete Method: Corr = ", signif(l[[2]])))
-
-avg_dend_obj3 <- as.dendrogram(hr3)
-labels_colors(avg_dend_obj3) <- "white"
-plot(avg_dend_obj3, main = paste0("Single Method: Corr = ", signif(l[[3]])))
-
-avg_dend_obj4 <- as.dendrogram(hr4)
-labels_colors(avg_dend_obj4) <- "white"
-plot(avg_dend_obj4, main = paste0("Median Method: Corr = ", signif(l[[4]])))
-
-avg_dend_obj5 <- as.dendrogram(hr5)
-labels_colors(avg_dend_obj5) <- "white"
-plot(avg_dend_obj5, main = paste0("Centroild Method: Corr = ", signif(l[[5]])))
-
-avg_dend_obj6 <- as.dendrogram(hr6)
+png("Data/dendro_ward.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+avg_dend_obj6 <- as.dendrogram(hr)
 labels_colors(avg_dend_obj6) <- "white"
-plot(avg_dend_obj6, main = paste0("Ward Method: Corr = ", signif(l[[6]])))
-
+plot(avg_dend_obj6, main = paste0("Ward Method: Corr = ", signif(corr_cophVSdist)))
 dev.off()
 
 
@@ -320,9 +226,9 @@ This chunk can be reused for the PASS + Warn or the WARN filters by changing the
 ```{r echo=TRUE}
 
   set.seed(42)
-  c<-as.dist(1-cor(t(vsd), method="spearman"))
-  hr <- hclust(c , method="average")
-  mycl <- cutree(hr, k=4)
+  c<-as.dist(1-cor(t(tmm_agg_s), method="spearman"))
+  hr <- hclust(c , method="ward.D2")
+  mycl <- cutree(hr, k=200)
   mycl_length <- length(unique(mycl))
   mycl_length
   clusters <- as.data.frame(mycl)
@@ -410,20 +316,10 @@ saveRDS(GO_table, "GO_table.rds")
 
 ```{r eval=FALSE, include=FALSE}
 
-# A nested list with of the genes grouped per cluster and their 
-# corresponding correlation values. 
-corr_allClusters <- corr_per_clust(logcounts, clusters, 100)
+# Determine min-max cut value through trial and error to get 20 to 2000 total clusters
 
-# Save the correlations per cluster
-saveRDS(corr_allClusters, "corr_allClusters.rds")
-
-
-# A list of data frames containing all GO terms associated with the genes belonging to a cluster.
-
-GOterms_allClusters <- GO_per_cl(GO_table, clusters, 100)
-
-# Save the GO terms grouped per cluster
-saveRDS(GOterms_allClusters, "GOterms_allClusters.rds")
+cuttree_val_ward <- cl_lengthCut(hr=hr, min=4, max=2000, interval=2)
+saveRDS(cuttree_val_ward, "cuttree_val_ward.rds")
 
 ```
 
