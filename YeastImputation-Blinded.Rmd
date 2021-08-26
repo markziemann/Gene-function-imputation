@@ -39,24 +39,12 @@ source("functions.R")
 ### Load Pre-requisite RDS files 
 ```{r echo=TRUE}
 file_PASS <- "tmm_agg_s.rds"
-file_cl_s <- "mycl_s_aggCL_sp.rds"
-file_cl_tmm_sp <- "mycl_tmm_aggCL_sp.rds"
-file_cl_tmm_pr <- "mycl_tmm_aggCL_pr.rds"
 file_GO <-"GO_table.rds"
-file_cuttree_values <- "cuttree_values.rds"
-file_hr_s <- "s_aggCL_sp.rds"
-file_hr_tmm_sp <- "tmm_aggCL_sp.rds"
-file_hr_tmm_pr <- "tmm_aggCL_pr.rds"
+file_cuttree_values <- "cuttree_val_ward.rds"
 
 tmm_agg_s <- readRDS(file_PASS)
-
-clusters_s <- readRDS(file_cl_s)
-clusters_tmm_sp <- readRDS(file_cl_tmm_sp)
-clusters_tmm_pr <- readRDS(file_cl_tmm_pr)
-HR_s <- readRDS(file_hr_s)
-HR_tmm_sp <- readRDS(file_hr_tmm_sp)
-HR_tmm_pr <- readRDS(file_hr_tmm_pr)
 GO_table <- readRDS(file_GO)
+cuttree_values <- readRDS(file_cuttree_values)
 ```
 
 ### 1. Blinding known GO terms
@@ -83,79 +71,62 @@ GO_blinded[ind_blinded, 2:ncol(GO_blinded)] = 0
 
 ```
 
-### 2a. Determine min-max cut value through trial and error to get 20 to 2000 total clusters
-
-```{r }
-
-cuttree_values_ave <- cl_lengthCut(hr=hr, min=4, max=2000, interval=2)
-saveRDS(cuttree_values_ave, "cuttree_values_aves.rds")
-
-# cuttree_values_s <- cl_lengthCut(hr=hr, min=1.31, max=4.8, interval=0.001)
-# saveRDS(cuttree_values_s, "cuttree_values.rds")
-
-```
-</br>
-
-
-### 2b. Coarse Sweep for Spearman + complete linkage (SandC)
+### 2. Coarse Sweep for Spearman + complete linkage (SandC)
 The following code will perform a K-fold validation for the imputation process which uses Pearson method to measure the distance matrix and complete as linkage method during the clustering process. 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 # Coarse sweep of the following parameters: cluster total(20, 50, 200, 500) and threshold (0.1, 0.4, 0.8)
 
 cl_list <- c(20, 50, 100, 300, 500)
 thresh_list <- c(0.1, 0.4, 0.8)
 
-# Scaled
-CS_s <- kfold(cl_list, thresh_list, cuttree_values_ave, tmm_agg_s, GO_table, GO_blinded)
-    saveRDS(CS_s, "CS_s.rds")
-    
+CS_ward <- kfold(cl_list, thresh_list, cuttree_values, tmm_agg_s, GO_table, GO_blinded)
+    saveRDS(CS_s, "CS_ward.rds")
+
+# Testing bigger clusters
+
+GO_blinded <-readRDS("GO_blinded.rds")
+thresh_list <- c(0.1, 0.4, 0.8)
+
+cl_list700 <- c(700)
+CS_700_ward <- kfold(cl_list700, thresh_list, cuttree_values, tmm_agg_s, GO_table, GO_blinded)
+saveRDS(CS_700_ward, "PredictionScores/CS_700_ward.rds")
 
 ```
 
-### 2c. Summary of performace measures for Pearson + complete linkage
+### 3. Summary of performace measures for Pearson + complete linkage
 
 ```{r}
 
-dat_list_s <- lapply(CS_s, function(x) x[names(x)!="Index_folds"])
-dat_list_tmm_pr <- lapply(CS_tmm_pr, function(x) x[names(x)!="Index_folds"])
-dat_list_tmm_sp <- lapply(CS_tmm_sp, function(x) x[names(x)!="Index_folds"])
+dat_list <- lapply(CS_ward, function(x) x[names(x)!="Index_folds"])
 
 # List the all the mean predicton scores for each parameter 
-summary_all_s <- summary_Csweep(dat_list_s)
-saveRDS(summary_all_s, "summary_all_s.rds")
-
-summary_all_tmm_pr <- summary_Csweep(dat_list_tmm_pr)
-saveRDS(summary_all_tmm_pr, "summary_all_tmm_pr.rds")
-
-summary_all_tmm_sp <- summary_Csweep(dat_list_tmm_sp)
-saveRDS(summary_all_tmm_sp, "summary_all_tmm_sp.rds")
-
+summary_all <- summary_Csweep(dat_list)
+saveRDS(summary_all, "summary_all.rds")
 
 ```
 
-### 5. Visualizations
+### 4. Visualizations
 
 ```{r}
 
 # cut tree value vs Total Clusters – line diagram
-cuttree_totals_df <- function(cuttree_values, x){
-  as.data.frame(as.numeric(names(cuttree_values)))
+cuttree_totals_df <- function(cuttree_values){
+  df <- as.data.frame(as.numeric(names(cuttree_values)))
   m <- list()
   for (i in 1:length(cuttree_values)){
     x <- cuttree_values[[i]][["Cut_value"]]
     m[[i]] <- x
   }
-  cuttree_totals_df$CuttreeVal <- as.numeric(m)
-  colnames(cuttree_totals_df)[1] <- "ClTot"
-  n <- paste0("Data/", x, "cuttree_vs_clTotal.png")
-  png(as.character(n),
+  df$CuttreeVal <- as.numeric(m)
+  colnames(df)[1] <- "ClTot"
+  png("Data/cuttreeVSclTotal.png",
     width = 5*300,        # 5 x 300 pixels
     height = 5*300,
     res = 300,            # 300 pixels per inch
     pointsize = 8)        # smaller font size
   
-  ggplot(cuttree_totals_df, aes(x=CuttreeVal, y=ClTot)) +
+  ggplot(df, aes(x=CuttreeVal, y=ClTot)) +
     geom_line() + ylab("Total Number of Clusters") +
     xlab("Cuttree Values") +
     ggtitle("Cuttree Value vs Total Number of Clusters") +
@@ -164,14 +135,13 @@ cuttree_totals_df <- function(cuttree_values, x){
   dev.off()
 }
 
-cuttree_totals_df(cuttree_values_s, x="cuttree_values_s")
-cuttree_totals_df(cuttree_values_tmm_pr, x="cuttree_values_tmm_pr") 
-cuttree_totals_df(cuttree_values_tmm_sp, x="cuttree_values_tmm_sp") 
+cuttree_totals_df(cuttree_values)
+
  
 
 
 # Total genes per cluster  – violin plot
-c_violin <- function(cuttree_values,x){
+c_violin <- function(cuttree_values){
   
   clTotals <- do.call(rbind.data.frame, sapply(cuttree_values, "[[", 3))
   clTotals$ClusterSize <- as.factor(as.numeric(str_extract_all(rownames(clTotals), "^[:digit:]*(?=.)")))
@@ -184,9 +154,7 @@ c_violin <- function(cuttree_values,x){
   cluster200_500 <- clTotals[clTotals$ClusterSize %in% c(200, 300, 500),]
   cluster800_1500 <- clTotals[clTotals$ClusterSize %in% c(800, 1000, 1500),]
   
-  n <- paste0("Data/", x, "Violinplots.pdf")
-  
-  pdf(as.character(n))
+  pdf("Data/Violinplots.pdf")
   
   ggplot(cluster20_100, aes(x=ClusterSize, y=TotalGenes, fill=ClusterSize)) +
     geom_violin(trim=FALSE) + ylab("Total Number of Genes") +
@@ -215,11 +183,156 @@ c_violin <- function(cuttree_values,x){
   dev.off()
 }
 
-c_violin(cuttree_values_s, x="cuttree_values_s") 
-c_violin(cuttree_values_tmm_pr, x="cuttree_values_tmm_pr") 
-c_violin(cuttree_values_tmm_sp, x="cuttree_values_tmm_sp") 
+c_violin(cuttree_values) 
+
 
 ```
+
+### Imputation review
+
+```{r}
+
+# CL Tot = 50, thresh = 0.8
+
+impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
+  wGO_list <- list()
+  
+  for (i in 1:clust_total){
+    
+    GO_list <- rownames(cl_GOall[[i]])
+    
+    #If all the genes in the cluster have no GOs and the matrix is empty
+    if (is_empty(GO_list) == TRUE){
+      wGO_list[[paste0("Cluster", i)]][[paste0("Comment")]] <- "No Gene Ontologies found"
+      wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- 0
+      wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- 0
+      wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- 0
+      
+      next
+    }
+    
+    GO_list <- GO_list[order(GO_list)]
+    
+    corr_cl <- corr_clAll[[i]]
+    corr_cl <- corr_cl[order(rownames(corr_cl)),]
+    corr_cl <- corr_cl[,order(colnames(corr_cl))]
+    gene_list <- rownames(corr_cl)
+    
+    cl_go <- cl_GOall[[i]]
+    
+    #If all the genes in the cluster have no GOs and the matrix is empty
+    if (is_empty(cl_go) == TRUE){
+      wGO_list[[paste0("Cluster", i)]][[paste0("Comment")]] <- "No Gene Ontologies found"
+      wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- 0
+      wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- 0
+      wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- 0
+      
+      next
+    }
+    
+    # should add gene that are not included in the GO data otherwise merge 
+    # will yield weird results
+    diff_go_genes <- setdiff(gene_list,rownames(cl_go))
+    add <- data.frame(matrix(0,nrow=length(diff_go_genes),ncol=ncol(cl_go)))
+    rownames(add) <- diff_go_genes
+    colnames(add) <- colnames(cl_go)
+    cl_go <- rbind(cl_go,add)
+    cl_go <- cl_go[order(rownames(cl_go)),]
+    cl_go <- cl_go[,order(colnames(cl_go))]
+    
+    wGO_cl <- wcorr_cluster(gene_list=gene_list, corr_cl=corr_cl, cl_GO=cl_go)
+    wGO_df <- as.data.frame(do.call(rbind, wGO_cl))
+    wGO_thresh <- (as.matrix(wGO_df) > thresh)*1 
+    wGO_thresh <- wGO_thresh[order(rownames(wGO_thresh)),]
+    wGO_thresh <- wGO_thresh[,order(colnames(wGO_thresh))]
+    
+    cl_subtract <- wGO_thresh - cl_go
+    # need to flip some of the values where NAs were replaced with zeros.
+    cl_subtract[cl_subtract<0] <- 1
+    
+    wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- cl_go
+    wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- wGO_thresh
+    wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- cl_subtract
+    
+  }
+  return(wGO_list)
+}
+
+cross_val <- function(n, GO_annot, clusters,
+                      GO_list_perCl, corr_clAll,
+                      wGO_allClusters, clust_total, 
+                      thresh){
+  stats <- list()
+  
+  # partition the data
+  nfolds <- n
+  set.seed(42)
+  folds <- sample(1:nfolds, nrow(GO_annot), replace = TRUE)
+  
+  dict_folds <- data.frame(GO_annot$GeneID, folds)
+  
+  for (i in 1:n){
+    
+    which_fold <- i
+    
+    ind_blinded <- which(dict_folds$folds == which_fold)
+    GO_blinded <- GO_annot
+    GO_blinded[ind_blinded, 2:ncol(GO_blinded)] = 0
+    
+    # Get the GO terms by cluster using the blinded data 
+    # and the GO list per cluster
+    GO_blindedCl <- GO_per_cl_blinded(GO_blinded, clusters, 
+                                      GO_list_perCl, clust_total)
+    
+    # Impute function
+    wGO_blinded <- impute(GO_blindedCl, corr_clAll,
+                          clust_total, thresh)
+    
+    # stats
+    stats_perCl <- stats_cl(wGO_allClusters, wGO_blinded, clust_total)
+    stats_final <- stats_all(stats_perCl)
+    
+    stats[[paste0("Fold", i)]] <- stats_final
+  }
+  stats[["Index_folds"]] <- dict_folds
+  return(stats)
+  
+}
+
+kfold <- function(cl_list, thresh_list, cuttree_values, logcounts=tmm_agg_s, GO_table, GO_blinded){
+  
+  scores <- list()
+  
+  for (i in cl_list){
+    print(i)
+    for (j in thresh_list){
+      print(j)
+      cl_tot <- as.character(i)
+      cl <- cuttree_values[[cl_tot]][["GeneID_assignments"]]
+      
+      corr_allCl <- corr_per_clust(logcounts, cl, i)
+      GOterms_perCl <- GO_per_cl(GO_table, cl, i)
+      GO_list_perCl <- GO_list_perClBlind(GOterms_perCl, i)
+      
+      # stats for thresholds
+      wGO_allCl <- impute(cl_GOall = GOterms_perCl,
+                          corr_clAll = corr_allCl,
+                          clust_total = i, thresh = j)
+      
+      sc <- cross_val(n=10, GO_annot=GO_table, clusters=cl,
+                      GO_list_perCl=GO_list_perCl,
+                      corr_clAll=corr_allCl,
+                      wGO_allClusters=wGO_allCl,
+                      clust_total=i, thresh=j)
+      
+      scores[[paste0(i, "_", j)]] <- sc
+    }
+  }
+  return(scores)
+}
+
+```
+
 
 ### Session Information 
 

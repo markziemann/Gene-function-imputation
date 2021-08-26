@@ -600,7 +600,7 @@ mycl_opt <- function(hr, cut_min,
 #           (TN), False Positive (FP), False Negative (FN), Sensitivity (TPR),
 #           Specificity (TNR), Precision (PPV), and F1 Score (F1)
 
-mean_Csweep <- function(kfold_list, stat_type=10) {
+mean_Csweep <- function(kfold_list, stat_type) {
   mean_df <- data.frame()
   
   mean_df <- do.call(rbind.data.frame, lapply(kfold_list[[1]], "[", stat_type))
