@@ -257,11 +257,10 @@ wcorr_cluster <- function(gene_list, corr_cl, cl_GO){
     rownames(weighted_go) <- weighted_go[,1]
     weighted_go[,1] <- c()
     weighted_go[is.na(weighted_go)] <- 0
-    corr_colsum <- sum(weighted_go[,1])
     weighted_go <- weighted_go[,1]*weighted_go[,2:ncol(weighted_go)]
-    #normalized_weighted_go <- colSums(weighted_go)/corr_colsum
-    weighted_go_ave <- colMeans(weighted_go) 
-    wcorr_result[[gene]] <- weighted_go_ave
+    corr_colsum <- colSums(cl_GO)
+    normalized_weighted_go <- colSums(weighted_go)/corr_colsum
+    wcorr_result[[gene]] <- normalized_weighted_go
   }
   setNames(wcorr_result, paste0(gene))
   return(wcorr_result)
@@ -333,8 +332,6 @@ impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
     wGO_thresh <- wGO_thresh[,order(colnames(wGO_thresh))]
     
     cl_subtract <- wGO_thresh - cl_go
-    # need to flip some of the values where NAs were replaced with zeros.
-    cl_subtract[cl_subtract<0] <- 1
     
     wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- cl_go
     wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- wGO_thresh
@@ -400,7 +397,7 @@ stats_cl <- function(input_df, blinded_df, clust_total){
   for (i in 1:clust_total){
     
     input <- input_df[[i]][["Input"]]
-    blind <- blinded_df[[i]][["Diff"]]
+    blind <- blinded_df[[i]][["Output"]]
     
     diff <- input - blind 
     sum <- input + blind
@@ -424,6 +421,7 @@ stats_cl <- function(input_df, blinded_df, clust_total){
     ACC <- (TP+TN)/(TP+TN+FP+FN)
     # F1 score (is the harmonic mean of precision and sensitivity)
     F1 <- (2*TP)/((2*TP)+FP+FN)
+    Recall <- TP/(TP+FN)
     
     stats_list[[paste0("Cluster", i)]][[paste0("TP")]] <- TP
     stats_list[[paste0("Cluster", i)]][[paste0("TN")]] <- TN
@@ -435,6 +433,7 @@ stats_cl <- function(input_df, blinded_df, clust_total){
     stats_list[[paste0("Cluster", i)]][[paste0("Precision(PPV)")]] <- PPV
     stats_list[[paste0("Cluster", i)]][[paste0("Accuracy(ACC)")]] <- ACC
     stats_list[[paste0("Cluster", i)]][[paste0("F1_Score")]] <- F1
+    stats_list[[paste0("Cluster", i)]][[paste0("Recall")]] <- Recall
   }
   return(stats_list)
 }
@@ -477,7 +476,7 @@ stats_all <- function(stats_cl){
   BA <- (TPR+TNR)/2
   # F1 score (is the harmonic mean of precision and sensitivity)
   F1 <- (2*TP)/((2*TP)+FP+FN)
-  
+  Recall <- TP/(TP+FN)
   
   stats_total[["Stats_df"]] <- stats_df
   
@@ -491,6 +490,7 @@ stats_all <- function(stats_cl){
   stats_total[["Precision"]] <- PPV
   stats_total[["Accuracy"]] <- ACC
   stats_total[["F1_Score"]] <- F1
+  stats_total[["Recall"]] <- Recall
   
   return(stats_total)
 }
@@ -633,7 +633,7 @@ summary_Csweep <- function(kfold_list){
   summary_df <- summary[11,]
   rownames(summary_df)[rownames(summary_df) == "Mean"] <- row_name
   
-  stat_type_list <- c(7:10)
+  stat_type_list <- c(7:11)
   
   for (i in stat_type_list){
     summary <- mean_Csweep(kfold_list, stat_type=i)
