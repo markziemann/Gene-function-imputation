@@ -1,0 +1,260 @@
+---
+title: "Imputation Review"
+author: "M.Soria"
+date: "01/09/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+### Prerequisite libraries
+```{r Libraries, echo=TRUE}
+suppressPackageStartupMessages({
+    library(igraph)
+})
+
+source("functions.R")
+
+```
+
+### Load Pre-requisite RDS files 
+```{r echo=TRUE}
+file_PASS <- "tmm_agg_s.rds"
+file_GO <-"GO_table.rds"
+file_cuttree_values <- "cuttree_values_ward.rds"
+
+tmm_agg_s <- readRDS(file_PASS)
+GO_table <- readRDS(file_GO)
+cuttree_values <- readRDS(file_cuttree_values)
+```
+
+### Blind GO Terms (70-30 split)
+
+30 per cent of GeneIDs will have zero Gene Ontology Annotations. This will serve as the training data. After the model has been optimised, these IDs will be unblided as the testing data.
+
+```{r echo=TRUE}
+#Fraction of the total number of genes to be blinded
+test_size <- floor(0.30 * nrow(GO_table))
+
+## set the seed to make your partition reproducible
+set.seed(42)
+blinded_ind <- sample(seq_len(nrow(GO_table)), size = test_size)
+GO_train <- GO_table
+GO_train[blinded_ind, 2:ncol(GO_train)] = 0
+
+saveRDS(GO_train, "GO_train.rds")
+
+```
+
+### Imputation Data 
+This process proceeds after normalisation and clustering. This chunk's output will be used in the imputation process
+
+```{r echo=TRUE}
+# A cluster total is set
+i = 100
+# Get GeneIDs and their membership tags (a number from 1 to i) to a cluster
+cl <- cuttree_values[[i]][["GeneID_assignments"]]
+head(cl)
+
+# Get correlations per cluster
+# cl will be used to filter geneIDs belonging to, say, cluster 1
+corr_allCl <- corr_per_clust(tmm_agg_s, cl, i)
+# Get GO Annotations per cluster
+GOterms_perCl <- GO_per_cl(GO_train, cl, i)
+# GO terms list per cluster
+GO_list_perCl <- GO_list_perClBlind(GOterms_perCl, i)
+
+```
+
+### Imputation
+For demonstration, we will take cluster 3 with 49 member genes and set the threshold at 0.5
+```{r echo=TRUE}
+# Take cluster3 as sample cluster (49 members)
+cl3 <- corr_allCl[[3]]
+# Filter GO terms for cl3
+cl_go <- GOterms_perCl[[3]]
+# GeneIDs
+gene_list <- rownames(cl3)
+# Set a threshold 
+thresh = 0.5
+```
+
+### Get an adjacency/edge list from the correlation matrix
+***Previous method***: the correlation matrix of each cluster was used to filter the "weights" of the network connection. 
+</br></br>
+***Errors***: the correlation matrix has duplicate values since the upper triangle is a mirror of the lower and this was not accounted for. The idea of using the lower triangle like the one below also ocurred.
+
+```{r echo=FALSE}
+cl3_tri <- cl3
+cl3_tri[upper.tri(cl3_tri,diag=TRUE)] <- 1
+cl3_tri[1:6, 1:5]
+```
+
+However, taking the correlation values by row like the previous process, will not capture the network connections per gene.
+</br></br>
+***Solution***: Using the igraph library, each GeneID is treated as a node and and a list is formed which gene pairs forming edges. The correlation value is treated as the edge weight. **The diagonal should be included and set to 1** to keep all the gene data including the gene's connection to itself. 
+
+```{r echo=TRUE}
+# Create igraph object
+cor_g <- graph_from_adjacency_matrix(cl3, mode='directed', weighted = 'correlation', diag = TRUE)
+# Extract edge list
+cor_edge_list <- as_data_frame(cor_g, 'edges')
+head(cor_edge_list)
+
+```
+
+### Plot the Cluster Network
+Here we can visualise each cluster as a network. Plot1 is Cluster3 without applying any threshold. All of the genes are connected to each other. Using the edge list, we can select one node (in this case GeneID = YDL243C) and we can visualise the network as seen on Plot2. In Plot3 the same network is visualised by applying threshold = 0.3. Both of the last two plots have their edge thickness correspond to its correlation value - the thicker the edge, the higher the value.
+
+```{r echo=FALSE, fig.width=6, fig.height=6}
+# Plot of cluster 3 network
+cl_graph <- graph.data.frame(cor_edge_list)
+area = vcount(cl_graph)^2
+l <- layout_with_lgl(cl_graph, cellsize = sqrt(sqrt(area)))
+
+plot(cl_graph, layout = l,
+     vertex.label.dist=2,
+     edge.arrow.size=0.2, 
+     vertex.label.cex=0.7, 
+     vertex.label.family="Helvetica",
+     vertex.label.font=2,
+     vertex.shape="circle", 
+     vertex.size=5)
+title("Plot1: Cluster3 Network - no threshold", line = 1.2)
+
+# Plot of one node (gene)
+gene = gene_list[[1]] #"YDL243C"
+
+node <- cor_edge_list[cor_edge_list$from %in% gene,]
+node_graph <- graph.data.frame(node)
+# Amplify or decrease the width of the edges
+edgeweights <-E(node_graph) * 0.05
+l <- layout_with_lgl(node_graph)
+plot(node_graph, layout = l,
+     vertex.label.dist=1,
+     edge.arrow.size=0.2, 
+     vertex.label.cex=0.7, 
+     vertex.label.family="Helvetica",
+     vertex.label.font=2,
+     vertex.shape="circle", 
+     vertex.size=5, 
+     edge.width=edgeweights)
+title("Plot2: Cluster3, Gene (YDL243C) Network - no threshold", line = 1.2)
+
+# Plot of one node (gene) with threshold
+node <- cor_edge_list[cor_edge_list$from %in% "YDL243C",]
+only_sig <- node[abs(node$correlation) > 0.3, ]
+node_sig_graph <- graph.data.frame(only_sig)
+# Amplify or decrease the width of the edges
+edgeweights <-E(node_sig_graph) * 1
+l <- layout.fruchterman.reingold(node_sig_graph, niter=50)
+
+plot(node_sig_graph, layout = l,
+     vertex.label.dist=2.5,
+     edge.arrow.size=1, 
+     vertex.label.cex=1, 
+     vertex.label.family="Helvetica",
+     vertex.label.font=2,
+     vertex.shape="circle", 
+     vertex.size=10, 
+     vertex.label.color="black", 
+     edge.width=edgeweights)
+title("Plot3: Cluster3, Gene (YDL243C) Network, threshold = 0.3", line = 1.2)
+```
+
+### Imputation process (continued)
+We will take the edge list, filter each gene as a node with the correlation values as weights.
+
+```{r echo=TRUE}
+# Get all the genes connected to gene = "YDL243C" and the corresponding correlation values
+corr_value_df <- cor_edge_list[cor_edge_list$from %in% gene,]
+head(corr_value_df)
+
+# Merge by rowname with the GO table for this cluster
+corr_value_df <- corr_value_df[,c(2,3)]
+rownames(corr_value_df) <- corr_value_df$to
+weighted_go <- merge(x = corr_value_df, y = cl_go, by = "row.names", all.x = TRUE)
+rownames(weighted_go) <- weighted_go[,1]
+weighted_go[,1:2] <- c()
+weighted_go[1:5,1:6]
+
+# Multiply the correlation values accross the GO table
+weighted_go <- weighted_go[,1]*weighted_go[,2:ncol(weighted_go)]
+weighted_go[1:5,1:6]
+
+# Assign 1 to the values equal to or above the set threshold
+wGO_thresh <- (as.matrix(weighted_go) >= thresh)*1 
+wGO_thresh[1:10,1:6]
+```
+
+#### This is where the decision to impute or not will take place.
+Remember that this matrix describes the relationship of gene "YDL243C" to the other genes in the cluster. After applying the threshold, we accepted the connections of the remaining genes as "valid". We can say, therefore, that any associations of gene "YDL243C" to any of the remaining genes is meaningful. 
+<br/><br/>
+With this in mind will take the sum of each column and conclude that any colSum > 0 will be taken as a membership to a GO ID. 
+
+```{r echo=TRUE}
+# Sum of each column
+imputed_go <- as.matrix(colSums(wGO_thresh))
+imputed_go[1:15,]
+```
+
+
+```{r echo=FALSE}
+# put everything to a function
+corr_cluster <- function(gene_list, cor_edge_list, cl_go, thresh){
+  wcorr_result <- list()
+  
+  for (gene in gene_list){
+    corr_value_df <- cor_edge_list[cor_edge_list$from %in% gene, c(2,3)]
+    rownames(corr_value_df) <- corr_value_df$to
+    weighted_go <- merge(x = corr_value_df, y = cl_go, by = "row.names", all.x = TRUE)
+    rownames(weighted_go) <- weighted_go[,1]
+    weighted_go[,1:2] <- c()
+    weighted_go <- weighted_go[,1]*weighted_go[,2:ncol(weighted_go)]
+    wGO_thresh <- (as.matrix(weighted_go) > thresh)*1 
+    imputed_go <- colSums(wGO_thresh)
+    wcorr_result[[gene]] <- imputed_go
+  }
+  setNames(wcorr_result, paste0(gene))
+  return(wcorr_result)
+}
+
+# Trying Cluster 3 with 49 member genes
+wGO_cl <- corr_cluster(gene_list=gene_list, cor_edge_list=cor_edge_list, cl_go=cl_go, thresh=thresh)
+
+```
+
+After iterating the process above for all the genes in cluster3, we get:
+
+```{r}
+wGO_df <- as.data.frame(do.call(rbind, wGO_cl))
+wGO_df[10:20,15:25]
+
+# Assign 1 to values greater than 0 
+wGO_df <- (as.matrix(wGO_df)>0)*1 
+wGO_df[10:20,15:25]
+
+# Order by row name and column name
+wGO_df <- wGO_df[order(rownames(wGO_df)),]
+wGO_df <- wGO_df[,order(colnames(wGO_df))]
+# Do the same for the original GO table 
+cl_go <- cl_go[order(rownames(cl_go)),]
+cl_go <- cl_go[,order(colnames(cl_go))]
+
+# Subtract the original GO table from the resulting 
+# Matrix to get the matrix containing the imputed matrix
+cl_subtract <- wGO_df - cl_go
+
+# Check if there are negative values
+# This should be zero
+length(which(wGO_df == -1))
+
+```
+
+
+
+### Session Information 
+
+```{r Session Info, echo=FALSE}
+sessionInfo()
+```

@@ -1,0 +1,178 @@
+---
+title: "WGCNA"
+output: html_document
+---
+
+### Prerequisite libraries
+```{r Libraries, echo=TRUE}
+suppressPackageStartupMessages({
+    library(WGCNA)
+    library(igraph)
+})
+
+source("functions.R")
+
+```
+
+### Load Pre-requisite RDS files 
+```{r echo=TRUE}
+file_PASS <- "tmm_agg_s.rds"
+file_GO <-"GO_table.rds"
+file_cuttree_values <- "cuttree_values_ward.rds"
+
+tmm_agg_s <- readRDS(file_PASS)
+GO_table <- readRDS(file_GO)
+cuttree_values <- readRDS(file_cuttree_values)
+```
+
+```{r}
+# The following setting is important, do not omit.
+options(stringsAsFactors = FALSE)
+
+# Choose a set of soft-thresholding powers
+powers = c(c(1:10), seq(from = 12, to=20, by=2))
+# Call the network topology analysis function
+sft = pickSoftThreshold(t(tmm_agg_vst), powerVector = powers, verbose = 5)
+# Plot the results:
+#sizeGrWindow(9, 5)
+#par(mfrow = c(1,2));
+pdf("Data/pickSoftThresholdVST.pdf")
+cex1 = 0.9;
+# Scale-free topology fit index as a function of the soft-thresholding power
+plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+     xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
+     main = paste("Scale independence"));
+text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+     labels=powers,cex=cex1,col="red");
+# this line corresponds to using an R^2 cut-off of h
+abline(h=0.9,col="red")
+# Mean connectivity as a function of the soft-thresholding power
+plot(sft$fitIndices[,1], sft$fitIndices[,5],
+     xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n",
+     main = paste("Mean connectivity"))
+text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=cex1,col="red")
+dev.off()
+
+softPower = 10;
+adjacency = adjacency(tmm_agg_vst, power = softPower);
+
+# Turn adjacency into topological overlap
+TOM = TOMsimilarity(adjacency);
+dissTOM = 1-TOM
+
+
+# Call the hierarchical clustering function
+geneTree = hclust(as.dist(dissTOM), method = "average");
+# Plot the resulting clustering tree (dendrogram)
+pdf("Data/geneTree.pdf")
+plot(geneTree, xlab="", sub="", main = "Gene clustering on TOM-based dissimilarity",
+labels = FALSE, hang = 0.04);
+dev.off()
+
+
+# We like large modules, so we set the minimum module size relatively high:
+minModuleSize = 5;
+# Module identification using dynamic tree cut:
+dynamicMods = cutreeDynamic(dendro = geneTree, distM = dissTOM,
+deepSplit = 4, pamRespectsDendro = TRUE,
+minClusterSize = minModuleSize);
+table(dynamicMods)
+
+
+# Convert numeric lables into colors
+dynamicColors = labels2colors(dynamicMods)
+table(dynamicColors)
+# Plot the dendrogram and colors underneath
+pdf("Data/geneTreeLabels.pdf")
+plotDendroAndColors(geneTree, dynamicColors, "Dynamic Tree Cut",
+dendroLabels = FALSE, hang = 0.03,
+addGuide = TRUE, guideHang = 0.05,
+main = "Gene dendrogram and module colors")
+dev.off()
+
+```
+
+### New Imputation process
+
+```{r}
+
+i = 100
+cl <- cuttree_values[[100]][["GeneID_assignments"]]
+
+corr_allCl <- corr_per_clust(tmm_agg_s, cl, i)
+GOterms_perCl <- GO_per_cl(GO_table, cl, i)
+GO_list_perCl <- GO_list_perClBlind(GOterms_perCl, i)
+
+# Cluster 11 = 9 members
+cor_mat <- corr_allCl[[47]]
+clGenesList <- rownames(cor_mat)
+nodelist <- scerevisiae_GO_matrix[scerevisiae_GO_matrix$GeneID %in% clGenesList,]
+
+GoList <- GO_table[GO_table$GeneID %in% rownames(cor_mat),]
+row.names(GoList) <- GoList$GeneID
+GoList <- GoList[,-1]
+ind <- which(colSums(GoList) > 0)
+GoList <- GoList[, ind]
+
+cor_g <- graph_from_adjacency_matrix(cor_mat, mode='directed', weighted = 'correlation', diag = FALSE)
+cor_edge_list <- as_data_frame(cor_g, 'edges')
+cor_edge_list <- cor_edge_list[cor_edge_list$from %in% "YDL171C",]
+graph <- graph.data.frame(cor_edge_list, directed = TRUE)
+only_sig <- cor_edge_list[abs(cor_edge_list$correlation) > .75, ]
+new_g <- graph_from_data_frame(only_sig, F)
+ceb <- cluster_edge_betweenness(graph)
+
+V(graph)$degree <- degree(graph)
+V(graph)$closeness <- centralization.closeness(graph)$res
+V(graph)$betweenness <- centralization.betweenness(graph)$res
+V(graph)$eigen <- centralization.evcent(graph)$vector
+
+# Amplify or decrease the width of the edges
+edgeweights <-E(new_g) * 2.0
+
+l <- layout.fruchterman.reingold(graph, niter=50)
+l3 <- layout_nicely(graph, dim=2)
+plot(graph, layout = l,
+     vertex.label.dist=2,
+     #edge.curved = TRUE,
+     edge.arrow.size=0.5, 
+     vertex.label.cex=1, 
+     vertex.label.family="Helvetica",
+     vertex.label.font=2,
+     vertex.shape="circle", 
+     vertex.size=10, 
+     vertex.label.color="black", 
+     edge.width=edgeweights)
+
+vertex_attr(graph)
+
+
+```
+
+### Imputation review
+
+```{r}
+# Set Total clusters
+i = 100
+# Filter GeneIDs per cluster
+cl <- cuttree_values[[100]][["GeneID_assignments"]]
+
+# Get correlations per cluster
+corr_allCl <- corr_per_clust(tmm_agg_s, cl, i)
+# Get GO Annotations per cluster
+GOterms_perCl <- GO_per_cl(GO_table, cl, i)
+# GO terms list per cluster
+GO_list_perCl <- GO_list_perClBlind(GOterms_perCl, i)
+
+# Cluster 11 = 9 members
+cor_mat <- corr_allCl[[47]]
+clGenesList <- rownames(cor_mat)
+
+```
+
+
+### Session Information 
+
+```{r Session Info, echo=FALSE}
+sessionInfo()
+```
