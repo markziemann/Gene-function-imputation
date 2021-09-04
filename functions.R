@@ -21,87 +21,6 @@ srx_agg <- function(x,counts="GeneCounts") {
   SRX_dat
 }
 
-
-# This function's output is a list that contains (1) a dataframe with genes 
-# and its corresponding cluster; (2) the number of clusters produced; 
-# and (3) the heirarchical clustering object, hr, that can be used to 
-# change the number of clusters produced by adjusting cut_hmax
-# Input:
-# counts = normalized RNA seq data
-# cut_hmax = used to optimise cluster size; denominator for h=max
-
-cluster <- function(counts, cut_hmax){
-  
-  cluster_data <- list()
-  
-  # Hierarchical Clustering
-  cl <-as.dist(1-cor(t(counts), method="spearman"))
-  hr <- hclust(cl , method="complete")
-  
-  # optimizing the cluster size
-  mycl <- cutree(hr, h=max(hr$height/cut_hmax))
-  # Check the number of clusters. Can be adjusted by changing the h=max denominator
-  mycl_length <- length(unique(mycl))
-  
-  # Prepare Cluster data frame
-  clusters <- as.data.frame(mycl)
-  colnames(clusters) <- "ClusterNumber"
-  
-  # make a new column, GeneID, from rownames
-  clusters$GeneID <- rownames(clusters)
-  
-  cluster_data[["Clusters"]] <- clusters
-  cluster_data[["Cl_length"]] <- mycl_length
-  cluster_data[["hr"]] <- hr
-  
-  return(cluster_data)
-}
-
-
-# This function's output is a list of data frames containing all GO 
-# terms of GeneIDs grouped by cluster. 
-# Input:
-# GO_annot = scerevisiae_GO_matrix_wide (matrix of genes belonging to a GO term)
-# y = clusters (matrix of genes w/ cluster number)
-# clust_total = total number of clusters
-
-GO_per_cl <- function(GO_annot, clusters, clust_total){
-  GO_cl <- list()
-  for (i in 1:clust_total){
-    clusterX <- clusters[clusters$ClusterNumber == i,]
-    cluster_list <- as.list(clusterX$GeneID)
-    cluster_GOterms <- GO_annot[GO_annot$GeneID %in% cluster_list,]
-    rownames(cluster_GOterms)<- cluster_GOterms[,1] 
-    cluster_GOterms[,1] <- c()
-    cluster_GOterms <- cluster_GOterms[,which(colSums(cluster_GOterms) > 0)]
-    GO_cl[[paste0("Cluster", i)]] <- cluster_GOterms
-  }
-  return(GO_cl)
-}
-
-
-### ------------- Cluster Analysis
-
-# This function's output is a nested list of the genes grouped 
-# per cluster and their corresponding correlation values. 
-# Inputs:
-# x = logcounts (normalized gene counts from RNA seq)
-# y = clusters (matrix of genes w/ cluster number)
-# clust_total = total number of clusters
-
-corr_per_clust <- function(x, y, clust_total){
-  corr_cl <- list()
-  for (i in 1:clust_total){
-    clusterX <- y[y$ClusterNumber == i,]
-    cluster_list <- as.list(clusterX$GeneID)
-    cluster <- x[rownames(x) %in% cluster_list,]
-    corr_result <- cor(t(cluster))
-    corr_cl[[paste0("Cluster", i)]] <- corr_result
-  }
-  return(corr_cl)
-}
-
-
 # This function's output is a list  grouped by total clusters 
 # which gives (1) a table of GeneIDs assigned to a cluster number, 
 # (2) the cutree denominator to achieve that total cluster, and
@@ -149,6 +68,51 @@ cl_lengthCut <- function(hr, min, max, interval){
     mycl_cuts[[paste0(mycl_length)]][["Tally"]] <- tallyDF
   }
   return(mycl_cuts)
+}
+
+# This function's output is a list that contains a dataframe with 
+# the pair of genes that makes up an edge (listed from and to)
+# with a corresponding correlation value treated as the edge 
+# weight. This list is created using the igraph library
+# Input:
+# corr_allCl = a list of correlation matrices per cluster
+# clust_total = total number of clusters
+
+edge_list <- function(corr_allCl, clust_total){
+  e_list <- list()
+  
+  for(i in 1:clust_total){
+    # Create igraph object
+    cor_g <- graph_from_adjacency_matrix(corr_allCl[[i]], mode='directed', weighted = 'correlation', 
+                                         diag = TRUE)
+    # Extract edge list
+    cor_edge_list <- get.data.frame(cor_g, 'edges')
+    
+    e_list[[paste0("Cluster", i)]] <- cor_edge_list
+  }
+  return(e_list)
+}
+
+
+### ------------- Cluster Analysis
+
+# This function's output is a nested list of the genes grouped 
+# per cluster and their corresponding correlation values. 
+# Inputs:
+# x = counts (normalized gene counts from RNA seq)
+# y = clusters (matrix of genes w/ cluster number)
+# clust_total = total number of clusters
+
+corr_per_clust <- function(x, y, clust_total){
+  corr_cl <- list()
+  for (i in 1:clust_total){
+    clusterX <- y[y$ClusterNumber == i,]
+    cluster_list <- as.list(clusterX$GeneID)
+    cluster <- x[rownames(x) %in% cluster_list,]
+    corr_result <- cor(t(cluster))
+    corr_cl[[paste0("Cluster", i)]] <- corr_result
+  }
+  return(corr_cl)
 }
 
 
@@ -240,35 +204,39 @@ GO_per_cl_blinded <- function(x,y,GO_list_perCl,clust_total){
 }
 
 
+### ------------- Imputation functions
+
 # This function's output is a nested list of genes belonging to a 
-# cluster with their corresponding weighted correlations. 
+# cluster with a tally of how many correlation values passed the threshold
+# that connects the gene to a GO Term. 
 # Input:
 # gene_list = list of genes to be correlated 
-# corr_cl = correlation values for cluster
-# cl_GO = GO terms for cluster
-# cl_num = cluster number
+# edgeList = an edge list (from igraph Library) from the correlation 
+#             values in a cluster
+# cl_GO = a list of GO terms for a cluster
+# thresh = threshold from 0 to 1
 
-wcorr_cluster <- function(gene_list, corr_cl, cl_GO){
+
+wcorr_cluster <- function(gene_list, edgeList, cl_go, thresh){
   wcorr_result <- list()
   
   for (gene in gene_list){
-    corr_value_df <- as.data.frame(corr_cl[gene,])
-    weighted_go <- merge(x = corr_value_df, y = cl_GO, by = "row.names", all.x = TRUE)
+    corr_value_df <- edgeList[edgeList$from %in% gene, c(2,3)]
+    rownames(corr_value_df) <- corr_value_df$to
+    weighted_go <- merge(x = corr_value_df, y = cl_go, by = "row.names", all.x = TRUE)
     rownames(weighted_go) <- weighted_go[,1]
-    weighted_go[,1] <- c()
+    weighted_go[,1:2] <- c()
+    # turn NA to zero for GeneIDs with no GO terms
     weighted_go[is.na(weighted_go)] <- 0
     weighted_go <- weighted_go[,1]*weighted_go[,2:ncol(weighted_go)]
-    corr_colsum <- colSums(cl_GO)
-    normalized_weighted_go <- colSums(weighted_go)/corr_colsum
-    wcorr_result[[gene]] <- normalized_weighted_go
+    wGO_thresh <- (as.matrix(weighted_go) > thresh)*1 
+    imputed_go <- colSums(wGO_thresh)
+    wcorr_result[[gene]] <- imputed_go
   }
   setNames(wcorr_result, paste0(gene))
   return(wcorr_result)
 }
 
-
-
-### ------------- Imputation function
 
 # This function's output is a nested list of gene clusters 
 # containing the data generated for cluster analysis. 
@@ -276,28 +244,16 @@ wcorr_cluster <- function(gene_list, corr_cl, cl_GO){
 # cl_GOall = GO terms per cluster
 # corr_clAll = correlation values grouped by cluster
 # corr_cl = correlations per cluster
+# cor_edge_list = an edge list (from igraph Library) from the correlation 
+# values per cluster
 # clust_total = total number of clusters
 # thresh = threshold value from 0 to 1
 
-impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
+impute <- function (cl_GOall, corr_clAll, clust_total, cor_edge_list, thresh){
   wGO_list <- list()
   
   for (i in 1:clust_total){
-    
-    GO_list <- rownames(cl_GOall[[i]])
-    
-    #If all the genes in the cluster have no GOs and the matrix is empty
-    if (is_empty(GO_list) == TRUE){
-      wGO_list[[paste0("Cluster", i)]][[paste0("Comment")]] <- "No Gene Ontologies found"
-      wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- 0
-      wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- 0
-      wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- 0
-      
-      next
-    }
-    
-    GO_list <- GO_list[order(GO_list)]
-    
+    print(i)
     corr_cl <- corr_clAll[[i]]
     corr_cl <- corr_cl[order(rownames(corr_cl)),]
     corr_cl <- corr_cl[,order(colnames(corr_cl))]
@@ -306,7 +262,7 @@ impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
     cl_go <- cl_GOall[[i]]
     
     #If all the genes in the cluster have no GOs and the matrix is empty
-    if (is_empty(cl_go) == TRUE){
+    if (is_empty(corr_cl) == TRUE){
       wGO_list[[paste0("Cluster", i)]][[paste0("Comment")]] <- "No Gene Ontologies found"
       wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- 0
       wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- 0
@@ -325,61 +281,27 @@ impute <- function (cl_GOall, corr_clAll, clust_total, thresh){
     cl_go <- cl_go[order(rownames(cl_go)),]
     cl_go <- cl_go[,order(colnames(cl_go))]
     
-    wGO_cl <- wcorr_cluster(gene_list=gene_list, corr_cl=corr_cl, cl_GO=cl_go)
+    edgeList <- cor_edge_list[[i]]
+    wGO_cl <- wcorr_cluster(gene_list=gene_list, edgeList=edgeList, 
+                            cl_go=cl_go, thresh=thresh)
     wGO_df <- as.data.frame(do.call(rbind, wGO_cl))
-    wGO_thresh <- (as.matrix(wGO_df) > thresh)*1 
+    #wGO_thresh <- (as.matrix(wGO_df) > 0)*1 
+    wGO_thresh <- (as.matrix(wGO_df) >=3)*1 
     wGO_thresh <- wGO_thresh[order(rownames(wGO_thresh)),]
     wGO_thresh <- wGO_thresh[,order(colnames(wGO_thresh))]
     
     cl_subtract <- wGO_thresh - cl_go
     
+    Neg1 <- length(which(cl_subtract == -1))
+    
     wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- cl_go
     wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- wGO_thresh
     wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- cl_subtract
+    wGO_list[[paste0("Cluster", i)]][[paste0("Neg1")]] <- Neg1
     
   }
   return(wGO_list)
 }
-
-
-# This function otputs a nested list of clusters containing heatmaps for 
-# input, output, and output-minus-input binary data frames generated by 
-# the imputation funtion
-# Input:
-# clust_total = total number of clusters you want to evaluate
-# wGO_allCl = a list object from the impute function containing the 
-# input, output, and output-minus-input data frames
-
-impute_viz <- function(clust_total, wGO_allCl){
-  
-  wGO_heatmaps <- list()
-  
-  for (i in 1:clust_total){
-    
-    par(cex.main = 0.5)
-    colfunc <- colorRampPalette(c("white", "red"))
-    
-    # create heatmap for input df
-    wGO_heatmaps[[paste0("Cluster", i)]][[paste0("Input")]] <- 
-      heatmap.2(as.matrix(wGO_allCl[[i]][["Input"]]), main=paste0("S.cerevisiae Cluster ",
-                                                                  i, " GO Terms"), scale="none", col = colfunc(25), trace="none", margins = 
-                  c(5,5))
-    
-    # create heatmap for output df
-    wGO_heatmaps[[paste0("Cluster", i)]][[paste0("Output")]] <- 
-      heatmap.2(as.matrix(wGO_allCl[[i]][["Output"]]), main=paste0("S.cerevisiae 
-                 Cluster ", i, " Imputed GO Terms"), scale="none", col = colfunc(25), 
-                trace="none", margins = c(5,5))
-    
-    # create heatmap for subtraction df
-    wGO_heatmaps[[paste0("Cluster", i)]][[paste0("Diff")]] <- 
-      heatmap.2(as.matrix(wGO_allCl[[i]][["Diff"]]), main=paste0("S.cerevisiae Cluster ", 
-                                                                 i, " GO Terms vs Imputed GO Terms"), scale="none", col = colfunc(25), 
-                trace="none", margins = c(5,5))
-  }
-  return(wGO_heatmaps)
-}
-
 
 ### ------------- Measures of performance 
 
@@ -391,12 +313,12 @@ impute_viz <- function(clust_total, wGO_allCl){
 # blinded_df = data frame, the imputed binary matrix using blinded data
 # clust_total = total number of clusters
 
-stats_cl <- function(input_df, blinded_df, clust_total){
+stats_cl <- function(blinded_df=clusterTot_impute, clust_total){
   stats_list <- list()
   
   for (i in 1:clust_total){
     
-    input <- input_df[[i]][["Input"]]
+    input <- blinded_df[[i]][["Input"]]
     blind <- blinded_df[[i]][["Output"]]
     
     diff <- input - blind 
@@ -417,10 +339,11 @@ stats_cl <- function(input_df, blinded_df, clust_total){
     TNR <- 1 - FPR
     # Precision/Positive Predictive Value (PPV)
     PPV <- TP/(TP+FP)
-    # accuracy (ACC)
+    # Accuracy (ACC)
     ACC <- (TP+TN)/(TP+TN+FP+FN)
     # F1 score (is the harmonic mean of precision and sensitivity)
     F1 <- (2*TP)/((2*TP)+FP+FN)
+    # Recall
     Recall <- TP/(TP+FN)
     
     stats_list[[paste0("Cluster", i)]][[paste0("TP")]] <- TP
@@ -515,8 +438,7 @@ stats_all <- function(stats_cl){
 
 cross_val <- function(n, GO_annot, clusters,
                       GO_list_perCl, corr_clAll,
-                      wGO_allClusters, clust_total, 
-                      thresh){
+                      clust_total, thresh){
   
   stats <- list()
   
@@ -540,12 +462,15 @@ cross_val <- function(n, GO_annot, clusters,
     GO_blindedCl <- GO_per_cl_blinded(GO_blinded, clusters, 
                                       GO_list_perCl, clust_total)
     
+    # Get the edge list per cluster
+    cor_edge_list <- edge_list(corr_allCl, clust_total)
+    
     # Impute function
     wGO_blinded <- impute(GO_blindedCl, corr_clAll,
-                          clust_total, thresh)
+                          clust_total, cor_edge_list, thresh)
     
     # stats
-    stats_perCl <- stats_cl(wGO_allClusters, wGO_blinded, clust_total)
+    stats_perCl <- stats_cl(wGO_blinded, clust_total)
     stats_final <- stats_all(stats_perCl)
     
     stats[[paste0("Fold", i)]] <- stats_final
@@ -555,40 +480,7 @@ cross_val <- function(n, GO_annot, clusters,
   
 }
 
-
 ### ------------- Optimisation 
-
-# This function's output is a list of values to use
-# as the denominator for hmax in the cutree function 
-# to get a desired number of the total clusters
-# Inputs:
-# hr = object from the hclust function
-# cut_min = hmax denominator value for cl_min (can start with 0)
-# cl_min, cl_max = min and max of total clusters
-# interval = intervals beween min and max total clusters
-
-mycl_opt <- function(hr, cut_min, 
-                     cl_min, cl_max, interval){
-  
-  mycl_cuts <- list()
-  cl_total <- seq(from = cl_min, to = cl_max, by = interval)
-  
-  # optimizing the cluster size
-  for (i in cl_total){
-    
-    cut = cut_min
-    mycl_length = 0
-    while (mycl_length!=i) {
-      mycl_length <- length(unique(cutree(hr, h=max(hr$height/cut))))
-      
-      if (mycl_length==i){
-        mycl_cuts[[paste0(i)]] <- cut
-      } else cut = cut + interval           
-    }
-  }
-  return(mycl_cuts)
-}
-
 
 # This function's output is a dataframe of the averaged 
 # value of a specific measure of performance from kfold from stats_all()
@@ -650,15 +542,14 @@ summary_Csweep <- function(kfold_list){
 # consisting of a total cluster and a threshold value. Each threshold 
 # value will be applied to each total cluster value.
 # Inputs:
-# cl_list = a numerical list denoting the target total cluster from 20 to 2000
+# cl_list = a list the target total clusters (ex: c(20,100,15000))
 # thresh_list = a numerical list denoting the target threshold value from 0 to 1
 # cuttree_values = the output of the cl_lengthCut()  function which gives a table
 #                 of GeneIDs assigned to clusters
-# logcounts = normalized gene counts from RNA seq
+# counts = normalized gene counts from RNA seq
 # GO_table = the Gene Onltology matrix for all GeneIDs
-# GO_blinded = the Gene Onltology matrix after blinding
 
-kfold <- function(cl_list, thresh_list, cuttree_values, logcounts, GO_table, GO_blinded){
+kfold <- function(cl_list, thresh_list, cuttree_values, counts, GO_table){
   
   scores <- list()
   
@@ -669,19 +560,13 @@ kfold <- function(cl_list, thresh_list, cuttree_values, logcounts, GO_table, GO_
       cl_tot <- as.character(i)
       cl <- cuttree_values[[cl_tot]][["GeneID_assignments"]]
       
-      corr_allCl <- corr_per_clust(logcounts, cl, i)
+      corr_allCl <- corr_per_clust(counts, cl, i)
       GOterms_perCl <- GO_per_cl(GO_table, cl, i)
       GO_list_perCl <- GO_list_perClBlind(GOterms_perCl, i)
-      
-      # stats for thresholds
-      wGO_allCl <- impute(cl_GOall = GOterms_perCl,
-                          corr_clAll = corr_allCl,
-                          clust_total = i, thresh = j)
       
       sc <- cross_val(n=10, GO_annot=GO_table, clusters=cl,
                       GO_list_perCl=GO_list_perCl,
                       corr_clAll=corr_allCl,
-                      wGO_allClusters=wGO_allCl,
                       clust_total=i, thresh=j)
       
       scores[[paste0(i, "_", j)]] <- sc
@@ -730,3 +615,4 @@ cross_val_thresh <- function(interval){
   }
   return(kfold_gobal)
 }
+
