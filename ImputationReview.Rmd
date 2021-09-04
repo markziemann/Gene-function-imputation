@@ -98,7 +98,7 @@ However, taking the correlation values by row like the previous process, will no
 # Create igraph object
 cor_g <- graph_from_adjacency_matrix(cl3, mode='directed', weighted = 'correlation', diag = TRUE)
 # Extract edge list
-cor_edge_list <- as_data_frame(cor_g, 'edges')
+cor_edge_list <- get.data.frame(cor_g, 'edges')
 head(cor_edge_list)
 
 ```
