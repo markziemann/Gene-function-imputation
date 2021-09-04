@@ -312,7 +312,25 @@ saveRDS(GO_table, "GO_table.rds")
 
 ```
 
-### 10. Data preparation functions
+### 10. Blind GO Terms (90-10 split)
+
+30 per cent of GeneIDs will have zero Gene Ontology Annotations. This will serve as the training data. After the model has been optimised, these IDs will be unblided as the testing data.
+
+```{r echo=TRUE}
+#Fraction of the total number of genes to be blinded
+test_size <- floor(0.10 * nrow(GO_table))
+
+## set the seed to make your partition reproducible
+set.seed(42)
+blinded_ind <- sample(seq_len(nrow(GO_table)), size = test_size)
+GO_train <- GO_table
+GO_train[blinded_ind, 2:ncol(GO_train)] = 0
+
+saveRDS(GO_train, "GO_train.rds")
+
+```
+
+### 11. Data preparation functions
 
 ```{r eval=FALSE, include=FALSE}
 
