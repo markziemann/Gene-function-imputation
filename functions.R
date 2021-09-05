@@ -463,7 +463,7 @@ cross_val <- function(n, GO_annot, clusters,
                                       GO_list_perCl, clust_total)
     
     # Get the edge list per cluster
-    cor_edge_list <- edge_list(corr_allCl, clust_total)
+    cor_edge_list <- edge_list(corr_allCl=corr_clAll, clust_total)
     
     # Impute function
     wGO_blinded <- impute(GO_blindedCl, corr_clAll,
