@@ -206,14 +206,14 @@ set.seed(42)
 
 cl <-as.dist(1-cor(t(tmm_agg_s), method="spearman"))
 
-hr <- hclust(cl , method="ward.D2")
+hr <- hclust(cl , method="average")
 cophenetic.d = cophenetic(hr)
-corr_cophVSdist <- cor(corr, cophenetic.d)
+corr_cophVSdist <- cor(cl, cophenetic.d)
 
-png("Data/dendro_ward.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
+png("Data/dendro_Average.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
 avg_dend_obj6 <- as.dendrogram(hr)
 labels_colors(avg_dend_obj6) <- "white"
-plot(avg_dend_obj6, main = paste0("Ward Method: Corr = ", signif(corr_cophVSdist)))
+plot(avg_dend_obj6, main = paste0("Average Method: Corr = ", signif(corr_cophVSdist)))
 dev.off()
 
 
@@ -227,7 +227,7 @@ This chunk can be reused for the PASS + Warn or the WARN filters by changing the
 
   set.seed(42)
   c<-as.dist(1-cor(t(tmm_agg_s), method="spearman"))
-  hr <- hclust(c , method="ward.D2")
+  hr <- hclust(c , method="average")
   mycl <- cutree(hr, k=200)
   mycl_length <- length(unique(mycl))
   mycl_length
@@ -337,7 +337,7 @@ saveRDS(GO_train, "GO_train.rds")
 # Determine min-max cut value through trial and error to get 20 to 2000 total clusters
 
 cuttree_val_ward <- cl_lengthCut(hr=hr, min=4, max=2000, interval=2)
-saveRDS(cuttree_val_ward, "cuttree_val_ward.rds")
+saveRDS(cuttree_val_ward, "cuttree_values_ave.rds")
 
 ```
 
