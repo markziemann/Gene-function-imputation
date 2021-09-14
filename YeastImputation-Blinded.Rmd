@@ -41,11 +41,15 @@ source("functions.R")
 file_PASS <- "tmm_agg_s.rds"
 file_GO <-"GO_table.rds"
 file_GO_train <- "GO_train.rds"
-file_cuttree_values <- "cuttree_values_ward.rds"
+file_cuttree_values <- "cuttree_values_complete.rds"
 
+# Normalised, aggregated, and scaled RNASeq counts
 tmm_agg_s <- readRDS(file_PASS)
+# Binary df for GO annotations 
 GO_table <- readRDS(file_GO)
+# From GO_table, selected randomly as training data
 GO_train <- readRDS(file_GO_train)
+# List of genes grouped in different cluster sizes
 cuttree_values <- readRDS(file_cuttree_values)
 ```
 
@@ -55,13 +59,234 @@ The following code will perform a K-fold validation for the imputation process w
 ```{r eval=FALSE, include=FALSE}
 # Coarse sweep of the following parameters: cluster total(20, 50, 200, 500) and threshold (0.1, 0.4, 0.8)
 
-cl_list <- c(1000)
-thresh_list <- c(0.1,0.5,0.9)
+cl_list <- c(100)
+thresh_list <- c(0.5)
 
 start <- Sys.time()
 sample_kfold <- kfold(cl_list, thresh_list, cuttree_values, tmm_agg_s, GO_train)
 end <- Sys.time()
 totalTime <- end -start
+
+
+kfold <- function(cl_list, thresh_list, cuttree_values, counts, GO_annot){
+  
+  scores <- list()
+  
+  for (i in cl_list){
+    print(i)
+    for (j in thresh_list){
+      print(j)
+      cl_tot <- as.character(i)
+      cl <- cuttree_values[[cl_tot]][["GeneID_assignments"]]
+      
+      corr_clAll <- corr_per_clust(counts, cl, i)
+      GOterms_perCl <- GO_per_cl(GO_table, cl, i)
+      GO_list_perCl <- GO_list_perClBlind(GOterms_perCl, i)
+      
+      sc <- cross_val(n=10, GO_annot=GO_annot, clusters=cl,
+                      GOterms_perCl=GOterms_perCl,
+                      GO_list_perCl=GO_list_perCl,
+                      corr_clAll=corr_clAll,
+                      clust_total=i, thresh=j)
+      
+      scores[[paste0(i, "_", j)]] <- sc
+    }
+  }
+  return(scores)
+}
+
+
+cross_val <- function(n, GO_annot, clusters, GOterms_perCl,
+                      GO_list_perCl, corr_clAll,
+                      clust_total, thresh){
+  
+  stats <- list()
+  
+  # partition the data
+  nfolds <- n
+  set.seed(42)
+  folds <- sample(1:nfolds, nrow(GO_annot), replace = TRUE)
+  
+  dict_folds <- data.frame(GO_annot$GeneID, folds)
+  
+  for (i in 1:n){
+    
+    which_fold <- i
+    
+    ind_blinded <- which(dict_folds$folds == which_fold)
+    GO_blinded <- GO_annot
+    GO_blinded[ind_blinded, 2:ncol(GO_blinded)] = 0
+    
+    # Get the GO terms by cluster using the blinded data 
+    # and the GO list per cluster
+    GO_blindedCl <- GO_per_cl_blinded(GO_blinded, clusters, 
+                                      GO_list_perCl, clust_total)
+    
+    # Get the edge list per cluster
+    cor_edge_list <- edge_list(corr_allCl=corr_clAll, clust_total)
+    
+    # Impute function
+    wGO_blinded <- impute(GOterms_perCl, GO_blindedCl, corr_clAll,
+                          clust_total, cor_edge_list, thresh)
+    
+    # stats
+    stats_perCl <- stats_cl(wGO_blinded, clust_total)
+    stats_final <- stats_all(stats_perCl)
+    
+    stats[[paste0("Fold", i)]] <- stats_final
+  }
+  stats[["Index_folds"]] <- dict_folds
+  return(stats)
+  
+}
+
+stats_cl <- function(blinded_df, clust_total){
+  stats_list <- list()
+  
+  for (i in 1:clust_total){
+    
+    input <- blinded_df[[i]][["Input"]]
+    blind <- blinded_df[[i]][["Output"]]
+    
+    diff <- input - blind 
+    sum <- input + blind
+    
+    TP <- length(which(sum == 2)) #True positive
+    TN <- length(which(sum == 0)) #True negative
+    FP <- length(which(diff == -1)) #False positive
+    FN <- length(which(diff == 1)) #False negative
+    
+    # False negative rate (FNR)
+    FNR <- FN/(FN+TP)
+    # Sensitivity/True Positive Rate (TPR)
+    TPR <- 1 - FNR
+    # False Positive Rate (FPR)
+    FPR <- FP/(FP+TN)
+    # Specificity/True Negative Rate (TNR)
+    TNR <- 1 - FPR
+    # Precision/Positive Predictive Value (PPV)
+    PPV <- TP/(TP+FP)
+    # Accuracy (ACC)
+    ACC <- (TP+TN)/(TP+TN+FP+FN)
+    # F1 score (is the harmonic mean of precision and sensitivity)
+    F1 <- (2*TP)/((2*TP)+FP+FN)
+    # Recall
+    Recall <- TP/(TP+FN)
+    
+    stats_list[[paste0("Cluster", i)]][[paste0("TP")]] <- TP
+    stats_list[[paste0("Cluster", i)]][[paste0("TN")]] <- TN
+    stats_list[[paste0("Cluster", i)]][[paste0("FP")]] <- FP
+    stats_list[[paste0("Cluster", i)]][[paste0("FN")]] <- FN
+    
+    stats_list[[paste0("Cluster", i)]][[paste0("Sensitivity(TPR)")]] <- TPR
+    stats_list[[paste0("Cluster", i)]][[paste0("Specificity(TNR)")]] <- TNR
+    stats_list[[paste0("Cluster", i)]][[paste0("Precision(PPV)")]] <- PPV
+    stats_list[[paste0("Cluster", i)]][[paste0("Accuracy(ACC)")]] <- ACC
+    stats_list[[paste0("Cluster", i)]][[paste0("F1_Score")]] <- F1
+    stats_list[[paste0("Cluster", i)]][[paste0("Recall")]] <- Recall
+  }
+  return(stats_list)
+}
+
+
+
+impute <- function (GOterms_perCl, cl_GOall=GO_blindedCl, corr_clAll, clust_total, cor_edge_list, thresh){
+  wGO_list <- list()
+  
+  for (i in 1:clust_total){
+    print(i)
+    corr_cl <- corr_clAll[[i]]
+    
+    #If all the genes in the cluster have no GOs and the matrix is empty
+    if (is_empty(corr_cl) == TRUE || isTRUE(corr_cl == 0)){
+      wGO_list[[paste0("Cluster", i)]][[paste0("Comment")]] <- "No Gene Ontologies found"
+      wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- 0
+      wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- 0
+      wGO_list[[paste0("Cluster", i)]][[paste0("Blinded_GO")]] <- 0
+      wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- 0
+      
+      next
+    }
+    
+    corr_cl <- corr_cl[order(rownames(corr_cl)),]
+    corr_cl <- corr_cl[,order(colnames(corr_cl))]
+    gene_list <- rownames(corr_cl)
+    
+    cl_go <- cl_GOall[[i]]
+    cl_go_orig <- GOterms_perCl[[i]]
+    
+    # should add gene that are not included in the GO data otherwise merge 
+    # will yield weird results
+    diff_go_genes <- setdiff(gene_list,rownames(cl_go))
+    if(length(diff_go_genes) > 0) {
+    add <- data.frame(matrix(0,nrow=length(diff_go_genes),ncol=ncol(cl_go)))
+    rownames(add) <- diff_go_genes
+    colnames(add) <- colnames(cl_go)
+    cl_go <- rbind(cl_go,add)
+    }
+    cl_go <- cl_go[order(rownames(cl_go)),]
+    cl_go <- cl_go[,order(colnames(cl_go))]
+    
+    # Do the same process above for the orginal
+    # annotation matrix to use for model validation
+    diff_go_genes2 <- setdiff(gene_list,rownames(cl_go_orig))
+    # Check and add non-annotated genes
+    if(length(diff_go_genes2) > 0) {
+    add <- data.frame(matrix(0,nrow=length(diff_go_genes2),ncol=ncol(cl_go_orig)))
+    rownames(add) <- diff_go_genes2
+    colnames(add) <- colnames(cl_go_orig)
+    cl_go_orig <- rbind(cl_go_orig,add)
+    }
+    # Check and filter GO terms from blinded GO matrix (cl_go)
+    diff_go_annot <- setdiff(colnames(cl_go_orig),colnames(cl_go))
+    if(length(diff_go_annot) > 0){
+      cl_go_orig <- cl_go_orig[, colnames(cl_go_orig) %in% colnames(cl_go)]
+    }
+    
+    cl_go_orig <- cl_go_orig[order(rownames(cl_go_orig)),]
+    cl_go_orig <- cl_go_orig[,order(colnames(cl_go_orig))]
+    
+    edgeList <- cor_edge_list[[i]]
+    wGO_cl <- wcorr_cluster(gene_list=gene_list, edgeList=edgeList, 
+                            cl_go=cl_go, thresh=thresh)
+    wGO_df <- as.data.frame(do.call(rbind, wGO_cl))
+    #wGO_thresh <- (as.matrix(wGO_df) > 0)*1 
+    wGO_thresh <- (as.matrix(wGO_df) >=thresh)*1 
+    wGO_thresh <- wGO_thresh[order(rownames(wGO_thresh)),]
+    wGO_thresh <- wGO_thresh[,order(colnames(wGO_thresh))]
+    
+    cl_subtract <- wGO_thresh - cl_go
+    
+    wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- cl_go_orig
+    wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- wGO_thresh
+    wGO_list[[paste0("Cluster", i)]][[paste0("Blinded_GO")]] <- cl_go
+    wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- cl_subtract
+   
+    
+  }
+  return(wGO_list)
+}
+
+
+wcorr_cluster <- function(gene_list, edgeList, cl_go, thresh){
+  wcorr_result <- list()
+  
+  for (gene in gene_list){
+    corr_value_df <- edgeList[edgeList$from %in% gene, c(2,3)]
+    rownames(corr_value_df) <- corr_value_df$to
+    weighted_go <- merge(x = corr_value_df, y = cl_go, by = "row.names", all.x = TRUE)
+    rownames(weighted_go) <- weighted_go[,1]
+    weighted_go[,1:2] <- c()
+    # turn NA to zero for GeneIDs with no GO terms
+    weighted_go[is.na(weighted_go)] <- 0
+    weighted_go <- weighted_go[,1]*weighted_go[,2:ncol(weighted_go)]
+    #wGO_thresh <- (as.matrix(weighted_go) > thresh)*1 
+    imputed_go <- colSums(weighted_go)/colSums(cl_go)
+    wcorr_result[[gene]] <- imputed_go
+  }
+  setNames(wcorr_result, paste0(gene))
+  return(wcorr_result)
+}
 ```
 
 ### 3. Summary of performace measures for Pearson + complete linkage
