@@ -229,8 +229,8 @@ wcorr_cluster <- function(gene_list, edgeList, cl_go, thresh){
     # turn NA to zero for GeneIDs with no GO terms
     weighted_go[is.na(weighted_go)] <- 0
     weighted_go <- weighted_go[,1]*weighted_go[,2:ncol(weighted_go)]
-    wGO_thresh <- (as.matrix(weighted_go) > thresh)*1 
-    imputed_go <- colSums(wGO_thresh)
+    #wGO_thresh <- (as.matrix(weighted_go) > thresh)*1 
+    imputed_go <- colSums(weighted_go)/colSums(cl_go)
     wcorr_result[[gene]] <- imputed_go
   }
   setNames(wcorr_result, paste0(gene))
@@ -249,55 +249,78 @@ wcorr_cluster <- function(gene_list, edgeList, cl_go, thresh){
 # clust_total = total number of clusters
 # thresh = threshold value from 0 to 1
 
-impute <- function (cl_GOall, corr_clAll, clust_total, cor_edge_list, thresh){
+impute <- function (GOterms_perCl, cl_GOall=GO_blindedCl, corr_clAll, clust_total, cor_edge_list, thresh){
   wGO_list <- list()
   
   for (i in 1:clust_total){
     print(i)
     corr_cl <- corr_clAll[[i]]
-    corr_cl <- corr_cl[order(rownames(corr_cl)),]
-    corr_cl <- corr_cl[,order(colnames(corr_cl))]
-    gene_list <- rownames(corr_cl)
-    
-    cl_go <- cl_GOall[[i]]
     
     #If all the genes in the cluster have no GOs and the matrix is empty
-    if (is_empty(corr_cl) == TRUE){
+    if (is_empty(corr_cl) == TRUE || isTRUE(corr_cl == 0)){
       wGO_list[[paste0("Cluster", i)]][[paste0("Comment")]] <- "No Gene Ontologies found"
       wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- 0
       wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- 0
+      wGO_list[[paste0("Cluster", i)]][[paste0("Blinded_GO")]] <- 0
       wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- 0
       
       next
     }
     
+    corr_cl <- corr_cl[order(rownames(corr_cl)),]
+    corr_cl <- corr_cl[,order(colnames(corr_cl))]
+    gene_list <- rownames(corr_cl)
+    
+    cl_go <- cl_GOall[[i]]
+    cl_go_orig <- GOterms_perCl[[i]]
+    
     # should add gene that are not included in the GO data otherwise merge 
     # will yield weird results
     diff_go_genes <- setdiff(gene_list,rownames(cl_go))
-    add <- data.frame(matrix(0,nrow=length(diff_go_genes),ncol=ncol(cl_go)))
-    rownames(add) <- diff_go_genes
-    colnames(add) <- colnames(cl_go)
-    cl_go <- rbind(cl_go,add)
+    if(length(diff_go_genes) > 0) {
+      add <- data.frame(matrix(0,nrow=length(diff_go_genes),ncol=ncol(cl_go)))
+      rownames(add) <- diff_go_genes
+      colnames(add) <- colnames(cl_go)
+      cl_go <- rbind(cl_go,add)
+    }
     cl_go <- cl_go[order(rownames(cl_go)),]
     cl_go <- cl_go[,order(colnames(cl_go))]
+    
+    # Do the same process above for the orginal
+    # annotation matrix to use for model validation
+    diff_go_genes2 <- setdiff(gene_list,rownames(cl_go_orig))
+    # Check and add non-annotated genes
+    if(length(diff_go_genes2) > 0) {
+      add <- data.frame(matrix(0,nrow=length(diff_go_genes2),ncol=ncol(cl_go_orig)))
+      rownames(add) <- diff_go_genes2
+      colnames(add) <- colnames(cl_go_orig)
+      cl_go_orig <- rbind(cl_go_orig,add)
+    }
+    # Check and filter GO terms from blinded GO matrix (cl_go)
+    diff_go_annot <- setdiff(colnames(cl_go_orig),colnames(cl_go))
+    if(length(diff_go_annot) > 0){
+      cl_go_orig <- cl_go_orig[, colnames(cl_go_orig) %in% colnames(cl_go)]
+    }
+    
+    cl_go_orig <- cl_go_orig[order(rownames(cl_go_orig)),]
+    cl_go_orig <- cl_go_orig[,order(colnames(cl_go_orig))]
     
     edgeList <- cor_edge_list[[i]]
     wGO_cl <- wcorr_cluster(gene_list=gene_list, edgeList=edgeList, 
                             cl_go=cl_go, thresh=thresh)
     wGO_df <- as.data.frame(do.call(rbind, wGO_cl))
     #wGO_thresh <- (as.matrix(wGO_df) > 0)*1 
-    wGO_thresh <- (as.matrix(wGO_df) >=3)*1 
+    wGO_thresh <- (as.matrix(wGO_df) >=thresh)*1 
     wGO_thresh <- wGO_thresh[order(rownames(wGO_thresh)),]
     wGO_thresh <- wGO_thresh[,order(colnames(wGO_thresh))]
     
     cl_subtract <- wGO_thresh - cl_go
     
-    Neg1 <- length(which(cl_subtract == -1))
-    
-    wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- cl_go
+    wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- cl_go_orig
     wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- wGO_thresh
+    wGO_list[[paste0("Cluster", i)]][[paste0("Blinded_GO")]] <- cl_go
     wGO_list[[paste0("Cluster", i)]][[paste0("Diff")]] <- cl_subtract
-    wGO_list[[paste0("Cluster", i)]][[paste0("Neg1")]] <- Neg1
+    
     
   }
   return(wGO_list)
@@ -313,7 +336,7 @@ impute <- function (cl_GOall, corr_clAll, clust_total, cor_edge_list, thresh){
 # blinded_df = data frame, the imputed binary matrix using blinded data
 # clust_total = total number of clusters
 
-stats_cl <- function(blinded_df=clusterTot_impute, clust_total){
+stats_cl <- function(blinded_df, clust_total){
   stats_list <- list()
   
   for (i in 1:clust_total){
@@ -436,7 +459,7 @@ stats_all <- function(stats_cl){
 # clust_total = total number of clusters
 # thresh = threshold value from 0 to 1
 
-cross_val <- function(n, GO_annot, clusters,
+cross_val <- function(n, GO_annot, clusters, GOterms_perCl,
                       GO_list_perCl, corr_clAll,
                       clust_total, thresh){
   
@@ -466,7 +489,7 @@ cross_val <- function(n, GO_annot, clusters,
     cor_edge_list <- edge_list(corr_allCl=corr_clAll, clust_total)
     
     # Impute function
-    wGO_blinded <- impute(GO_blindedCl, corr_clAll,
+    wGO_blinded <- impute(GOterms_perCl, GO_blindedCl, corr_clAll,
                           clust_total, cor_edge_list, thresh)
     
     # stats
@@ -549,7 +572,7 @@ summary_Csweep <- function(kfold_list){
 # counts = normalized gene counts from RNA seq
 # GO_table = the Gene Onltology matrix for all GeneIDs
 
-kfold <- function(cl_list, thresh_list, cuttree_values, counts, GO_table){
+kfold <- function(cl_list, thresh_list, cuttree_values, counts, GO_annot){
   
   scores <- list()
   
@@ -560,13 +583,14 @@ kfold <- function(cl_list, thresh_list, cuttree_values, counts, GO_table){
       cl_tot <- as.character(i)
       cl <- cuttree_values[[cl_tot]][["GeneID_assignments"]]
       
-      corr_allCl <- corr_per_clust(counts, cl, i)
+      corr_clAll <- corr_per_clust(counts, cl, i)
       GOterms_perCl <- GO_per_cl(GO_table, cl, i)
       GO_list_perCl <- GO_list_perClBlind(GOterms_perCl, i)
       
-      sc <- cross_val(n=10, GO_annot=GO_table, clusters=cl,
+      sc <- cross_val(n=10, GO_annot=GO_annot, clusters=cl,
+                      GOterms_perCl=GOterms_perCl,
                       GO_list_perCl=GO_list_perCl,
-                      corr_clAll=corr_allCl,
+                      corr_clAll=corr_clAll,
                       clust_total=i, thresh=j)
       
       scores[[paste0(i, "_", j)]] <- sc
