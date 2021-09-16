@@ -137,26 +137,6 @@ GO_per_cl <- function(x,y,clust_total){
   return(GO_cl)
 }
 
-
-# This function's output is a nested list of GO terms (column names) grouped 
-# per cluster from the original input data frame before blinding
-# Input:
-# x = list object containing the input data frame before blinding
-# clust_total = total number of clusters
-
-GO_list_perCl <- function(x,clust_total){
-  GO_names <- list()
-  
-  for (i in 1:clust_total){
-    input <- x[[i]][["Input"]]
-    GO_list <- colnames(input)
-    
-    GO_names[[paste0("Cluster", i)]] <- GO_list
-  }
-  return(GO_names)
-}
-
-
 # This is a derivative of the GO_list_perCl fuction modified to accomodate
 # The different input data structure of the blinded genes
 # This function's output is a nested list of GO terms (column names) grouped 
@@ -165,7 +145,7 @@ GO_list_perCl <- function(x,clust_total){
 # x = list object containing the input data frame before blinding
 # clust_total = total number of clusters
 
-GO_list_perClBlind <- function(x,clust_total){
+GO_per_cl_list <- function(x,clust_total){
   GO_names <- list()
   
   for (i in 1:clust_total){
@@ -213,7 +193,7 @@ GO_per_cl_blinded <- function(x,y,GO_list_perCl,clust_total){
 # gene_list = list of genes to be correlated 
 # edgeList = an edge list (from igraph Library) from the correlation 
 #             values in a cluster
-# cl_GO = a list of GO terms for a cluster
+# cl_go = a list of GO terms for a cluster
 # thresh = threshold from 0 to 1
 
 
@@ -241,15 +221,16 @@ wcorr_cluster <- function(gene_list, edgeList, cl_go, thresh){
 # This function's output is a nested list of gene clusters 
 # containing the data generated for cluster analysis. 
 # Input:
-# cl_GOall = GO terms per cluster
+# GOterms_perCl = GO terms per cluster from GO_per_cl()
+# cl_GOall = GO terms per cluster from GO_per_cl_blinded()
 # corr_clAll = correlation values grouped by cluster
-# corr_cl = correlations per cluster
-# cor_edge_list = an edge list (from igraph Library) from the correlation 
-# values per cluster
 # clust_total = total number of clusters
+# cor_edge_list = an edge list (from igraph Library) from the correlation 
+#           values per cluster
 # thresh = threshold value from 0 to 1
 
-impute <- function (GOterms_perCl, cl_GOall=GO_blindedCl, corr_clAll, clust_total, cor_edge_list, thresh){
+impute <- function (GOterms_perCl, cl_GOall=GO_blindedCl, corr_clAll, 
+                    clust_total, cor_edge_list, thresh){
   wGO_list <- list()
   
   for (i in 1:clust_total){
@@ -332,17 +313,16 @@ impute <- function (GOterms_perCl, cl_GOall=GO_blindedCl, corr_clAll, clust_tota
 # performance of the imputation using the blinded and original data frames
 # grouped per cluster.
 # Inputs:
-# input_df = data frame, the original GO annotation binary matrix
-# blinded_df = data frame, the imputed binary matrix using blinded data
+# imputed_df = data frame, the imputed binary matrix from `impute()`
 # clust_total = total number of clusters
 
-stats_cl <- function(blinded_df, clust_total){
+stats_cl <- function(imputed_df, clust_total){
   stats_list <- list()
   
   for (i in 1:clust_total){
     
-    input <- blinded_df[[i]][["Input"]]
-    blind <- blinded_df[[i]][["Output"]]
+    input <- imputed_df[[i]][["Input"]]
+    blind <- imputed_df[[i]][["Output"]]
     
     diff <- input - blind 
     sum <- input + blind
@@ -385,7 +365,7 @@ stats_cl <- function(blinded_df, clust_total){
 }
 
 
-# This function's output is a list of vectors that measures the 
+# This function's output is a list of values measuring the 
 # performance of the whole imputation using the blinded 
 # and original data frames.
 # Input:
@@ -449,13 +429,11 @@ stats_all <- function(stats_cl){
 # n = number of folds
 # GO_annot = original GO annotation matrix
 # clusters = matrix of genes w/ cluster number
+# GOterms_perCl = GO terms per cluster from GO_per_cl()
 # GO_list_perCl = a nested list object containing the GO 
 #               terms (column names) of the original db
 #               (before blinding) in each cluster
 # corr_clAll = correlation values grouped by cluster
-# wGO_allClusters = A nested list of gene clusters containing 
-#               the data generated from cluster analysis using
-#               the impute function
 # clust_total = total number of clusters
 # thresh = threshold value from 0 to 1
 
@@ -475,7 +453,7 @@ cross_val <- function(n, GO_annot, clusters, GOterms_perCl,
   for (i in 1:n){
     
     which_fold <- i
-    
+    print(paste0("Fold ", i))
     ind_blinded <- which(dict_folds$folds == which_fold)
     GO_blinded <- GO_annot
     GO_blinded[ind_blinded, 2:ncol(GO_blinded)] = 0
@@ -506,9 +484,10 @@ cross_val <- function(n, GO_annot, clusters, GOterms_perCl,
 ### ------------- Optimisation 
 
 # This function's output is a dataframe of the averaged 
-# value of a specific measure of performance from kfold from stats_all()
+# value of a specific measure of performance from all cross 
+# validation folds
 # Inputs:
-# kfold_kist = a daframe containing all the measures of performance 
+# kfold_list = a daframe containing all the measures of performance 
 #             for each fold. See stats_all()
 # stat_type = a number indicating the measure of performance to be averaged
 #           from 1 to 10 in the ff order: Total Positive (TP), Total Negative
@@ -537,7 +516,7 @@ mean_Csweep <- function(kfold_list, stat_type) {
 # This function's output is a dataframe of the averaged 
 # value of all measures of performances for all folds from stats_all()
 # Inputs:
-# kfold_kist = a daframe containing all the measures of performance 
+# kfold_list = a daframe containing all the measures of performance 
 #             for each fold. See stats_all()
 
 
@@ -570,9 +549,9 @@ summary_Csweep <- function(kfold_list){
 # cuttree_values = the output of the cl_lengthCut()  function which gives a table
 #                 of GeneIDs assigned to clusters
 # counts = normalized gene counts from RNA seq
-# GO_table = the Gene Onltology matrix for all GeneIDs
+# GO_annot = the Gene Onltology matrix for all GeneIDs
 
-kfold <- function(cl_list, thresh_list, cuttree_values, counts, GO_annot){
+optimise_impute <- function(cl_list, thresh_list, cuttree_values, counts, GO_annot){
   
   scores <- list()
   
@@ -585,7 +564,7 @@ kfold <- function(cl_list, thresh_list, cuttree_values, counts, GO_annot){
       
       corr_clAll <- corr_per_clust(counts, cl, i)
       GOterms_perCl <- GO_per_cl(GO_table, cl, i)
-      GO_list_perCl <- GO_list_perClBlind(GOterms_perCl, i)
+      GO_list_perCl <- GO_per_cl_list(GOterms_perCl, i)
       
       sc <- cross_val(n=10, GO_annot=GO_annot, clusters=cl,
                       GOterms_perCl=GOterms_perCl,
