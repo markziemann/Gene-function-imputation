@@ -11,8 +11,11 @@ theme: cosmo
 
 ### Introduction
 
-The following code consists of the data preparation steps for the RNA-Seq data for Saccharomyces cerevisiae. 
-The data preparation consists of quality filtering, aggregation, and normalisation.
+The following code consists of the data preparation steps for the RNA-Seq data for Saccharomyces cerevisiae. The data preparation consists of quality filtering, aggregation, and normalisation.
+
+Clustering of the genes from this counts data for a series of cluster sizes is also performed to be used in the optimasation process.
+
+The GO annotation for yeast is also processed and transformed into a binary matrix for downstream processes.
 
 ### Prerequisite libraries
 
@@ -199,46 +202,63 @@ length(which(lt_melt$value ==0 )) # no zero values
 
 ```
 
-### Unsupervised Clustering
+### 7a. Hierarchical Clustering: linking method
+
+There are different ways of deciding the distance of elements for them to be grouped into a cluster.The correlation between the distance matrix and the cophenetic distance is calculated to to ensure good
+linkage method fit. 
 
 ```{r echo=TRUE}
 set.seed(42)
 
 cl <-as.dist(1-cor(t(tmm_agg_s), method="spearman"))
+hr <- hclust(cl , method="complete")
 
-hr <- hclust(cl , method="average")
+# Check the correlation between the distance 
+# matrix and the cophenetic distance 
 cophenetic.d = cophenetic(hr)
 corr_cophVSdist <- cor(cl, cophenetic.d)
 
 png("Data/dendro_Average.png", width = 5*300, height = 5*300, res = 300, pointsize = 8)
-avg_dend_obj6 <- as.dendrogram(hr)
-labels_colors(avg_dend_obj6) <- "white"
-plot(avg_dend_obj6, main = paste0("Average Method: Corr = ", signif(corr_cophVSdist)))
+dend <- as.dendrogram(hr)
+labels_colors(dend) <- "white"
+plot(dend, main = paste0("Complete Method: Corr = ", signif(corr_cophVSdist)))
 dev.off()
 
 
 ```
 
-### 7. Heirarchical Clustering with PASS only databases
-
-This chunk can be reused for the PASS + Warn or the WARN filters by changing the content of the filename object. Do not forget to change the name of the variable where you will save the clusters for different inputs. 
+### 7b. Heirarchical Clustering: deciding the number of clusters
+A specific number of clusters can be set using the cutree function.
 
 ```{r echo=TRUE}
 
-  set.seed(42)
-  c<-as.dist(1-cor(t(tmm_agg_s), method="spearman"))
-  hr <- hclust(c , method="average")
+# Using the argument k in cutree is a faster process vs
+# figuring out the cut height
   mycl <- cutree(hr, k=200)
   mycl_length <- length(unique(mycl))
+# Cluster size
   mycl_length
+# This is the base code used in the cl_lengthCut function below
   clusters <- as.data.frame(mycl)
   colnames(clusters) <- "ClusterNumber"
   clusters$GeneID <- rownames(clusters)
-  saveRDS(clusters, "clusters.rds")
+  
 
 ```
 
-### 8. Heatmaps for the clusters
+### 8. Clustering genes using different cluster sizes 
+
+This functions will will yield a list of genes grouped in cluster sized of 50 to 2000 to be used in downstream processes.
+
+```{r eval=FALSE, include=FALSE}
+
+cuttree_values <- cl_lengthCut(hr=hr, min=50, max=2000, interval=2)
+saveRDS(cuttree_values, "cuttree_values.rds")
+
+```
+
+
+### 9. Heatmaps for the clusters
 
 ```{r eval=FALSE, include=FALSE}
 # Visualizations
@@ -258,8 +278,9 @@ dev.off()
 
 ```
 
+### 10. Gene Ontology and Gene Data 
 
-### 9. Gene Ontology and Gene Data 
+A binary matrix was constructed with the Entrez Gene IDs (NCBI gene IDs) as rownames and GO IDs as the column names (wide format). If a GO ID is associated with a Gene ID, the cell will equal to 1, otherwise it will be zero. 
 
 ```{r}
 
@@ -312,9 +333,9 @@ saveRDS(GO_table, "GO_table.rds")
 
 ```
 
-### 10. Blind GO Terms (90-10 split)
+### 11. Blind GO Terms (90-10 split)
 
-30 per cent of GeneIDs will have zero Gene Ontology Annotations. This will serve as the training data. After the model has been optimised, these IDs will be unblided as the testing data.
+10 per cent of GeneIDs will have zero Gene Ontology Annotations. This will serve as the training data. After the model has been optimised, these IDs will be unblided as the testing data.
 
 ```{r echo=TRUE}
 #Fraction of the total number of genes to be blinded
@@ -327,17 +348,6 @@ GO_train <- GO_table
 GO_train[blinded_ind, 2:ncol(GO_train)] = 0
 
 saveRDS(GO_train, "GO_train.rds")
-
-```
-
-### 11. Data preparation functions
-
-```{r eval=FALSE, include=FALSE}
-
-# Determine min-max cut value through trial and error to get 20 to 2000 total clusters
-
-cuttree_val_ward <- cl_lengthCut(hr=hr, min=4, max=2000, interval=2)
-saveRDS(cuttree_val_ward, "cuttree_values_ave.rds")
 
 ```
 
