@@ -31,10 +31,11 @@ processing and Gene Ontology Annotation data processing. The processed data
 are saved as .rds files to be used in the downstream processes.</br>
 
 ### 1A. RNASeq Data
-Saccharomyces cerevisiae count and quality metrics data were downloaded from DEE2 
-- count: http://dee2.io/mx/scerevisiae_se.tsv.bz2
-- qc: http://dee2.io/mx/scerevisiae_qc.tsv.bz2)
-</br>
+Saccharomyces cerevisiae count and quality metrics data were downloaded from DEE2
+
+  - counts: http://dee2.io/mx/scerevisiae_se.tsv.bz2
+  - qc: http://dee2.io/mx/scerevisiae_qc.tsv.bz2)
+  
 Downloaded count data in long format is converted to wide format for easier matrix manipulation.
 
 #### *1Aa. Quality Control*
@@ -44,7 +45,7 @@ For all the downstream processes, only datasets tagged "PASSED" are used.
 
 #### *1Ab. Aggregating SRR to SRX*
 Sequence Read Archive (SRA) Accession Codes are also provided in the quality metrics data. These codes describes the source and type of the dataset.
-</br></br>
+</br>
 Accession code format: aRbx (Examples: SRR#, SRX#, ERR#, DRR#, etc.)</br>
 Where:</br>
 **First letter (represented by 'a' above)** Represents the source database to which the sample was originally uploaded, before being synchronised with the other 2 databases:</br>
@@ -117,7 +118,7 @@ The GO terms for the cluster is filtered and these values will be multiplied acr
 After assigning the weights, the values will averaged (*still figuring out the optimal method*) and a threshold will determine a cutoff value for the imputation process.
 
 ### 2D. Imputation process
-All values euql to and above the threshold value will be assigned as 1 (meaning the gene is annotated with the GO ID) and all values below will be assigned 0 (meaning the gene is does not belong to the GO ID). This will be repeated with all the gene IDS until a new GO annotation matrix with the same dimensions as the original one but with imputed values is created. 
+All values euqal to and above the threshold value will be assigned as 1 (meaning the gene is annotated with the GO ID) and all values below will be assigned 0 (meaning the gene is does not belong to the GO ID). This will be repeated with all the gene IDs until a new GO annotation matrix with the same dimensions as the original one but with imputed values is created. 
 </br>
 </br>
 
@@ -128,13 +129,13 @@ The imputation process will then be optimised using the techniques below.
 A series of cluster sizes and the threshold values is used to find the optimal parameters for imputation.
 
 ### 3B. Kfold validation
-Kfold cross validation at K = 10 is used to see if the parameters used yield optimal values. The GO annotation for a cluster will is divided into 10 parts. Part 1 of the gene IDS will have their annotations set to zero and this dataset will be used to run the first fold of the cross validation. Parts 2 to 10 will be used in the same manner and the process is reapeated until it reaches 10 folds.
+Kfold cross validation at K = 10 is used to see if the parameters used yield optimal values. The GO annotation for a cluster is divided into 10 parts. Part 1 of the gene IDs will have their annotations set to zero and this dataset will be used to run the first fold of the cross validation. Parts 2 to 10 will be used in the same manner and the process is repeated until it reaches 10 folds.
 
 ### 3C. Prediction Scores and the Confusion Matrix
 To measure the performance of each parameter pair, Accuracy, Precision, Recall, and the F1 score will be measured using a confusion matrix. 
 
 #### *Confusion Matrix*
-- Actual values = the GO matrix filtered for the cluster
+- Actual values = the binary GO matrix filtered for the cluster 
 - Predicted values = the GO matrix with the imputed values after running the algorithm.
 </br>
 
@@ -145,7 +146,7 @@ To measure the performance of each parameter pair, Accuracy, Precision, Recall, 
   
   
   To solve for TP and TN the following equation is used:</br>
-  TP/TN = Actual + Predicted
+  TP or TN = Actual + Predicted
 
   | **Addition**     | **Predicted 1**         | **Predicted 0**         |
   | :--------------: | :-------------:         | :-------------:         |
@@ -154,7 +155,7 @@ To measure the performance of each parameter pair, Accuracy, Precision, Recall, 
 
 
   To solve for FP and FN the following equation is used:</br>
-  TP/TN = Actual - Predicted
+  FP or FN = Actual - Predicted
 
   | **Subtraction** | **Predicted 1**          | **Predicted 0**         |
   |:---------------:|:---------------:         |:---------------:        |
@@ -189,15 +190,16 @@ To measure the performance of each parameter pair, Accuracy, Precision, Recall, 
 **srx_agg** - Multiple runs, if any, are aggregated to its corresponding experiment. Function from https://github.com/markziemann/getDEE2/issues/7#issuecomment-639290203 
 
 </br>
-**cl_lengthCut** - # This function's output is a list  grouped by total clusters which gives (1) a table of GeneIDs assigned to a cluster number, (2) the cutree denominator to achieve that total cluster, and (3) the tally of the total Gene IDs belonging to a cluster number.
+**cl_lengthCut** - This function's output is a list  grouped by total clusters which gives (1) a table of GeneIDs assigned to a cluster number, (2) the cutree denominator to achieve that total cluster, and (3) the tally of the total Gene IDs belonging to a cluster number.
+
 - Input:
     - hr = heirarchical clustering object from `hclust()` of the stats library
-    - min and max = minimum and maximum value of the denominator used in the cutree function       to determine total clusters
+    - min and max = minimum and maximum value of the denominator used in the cutree function to determine total clusters
     - interval = intervals for the vector of values between min and max used as input for          different cluster totals
 
 ### 4B. Imputation functions
 
-**wcorr_cluster** - "weights" the GO matrix of a cluster by multiplying all the correlation values of a gene from the `edge_list()` output; it then takes a weighted average of the matrix to be imputed later with a threshold value. This function's output is a nested list of genes belonging to a cluster with a tally of how many correlation values passed the threshold
+**wcorr_cluster** - assigns "weights" to the GO matrix of a cluster by multiplying all the correlation values of a gene from the `edge_list()` output; it then takes a weighted average of the matrix to be imputed later with a threshold value. This function's output is a nested list of genes belonging to a cluster with a tally of how many correlation values passed the threshold
 that connects the gene to a GO Term.
 
 - Input:
