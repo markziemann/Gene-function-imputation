@@ -563,6 +563,9 @@ optimise_impute <- function(cl_list, thresh_list, cuttree_values, counts, GO_ann
       cl <- cuttree_values[[cl_tot]][["GeneID_assignments"]]
       
       corr_clAll <- corr_per_clust(counts, cl, i)
+      # For faster runtime, set cluster 2 to 0
+      #corr_clAll[2] <- 0
+      
       GOterms_perCl <- GO_per_cl(GO_table, cl, i)
       GO_list_perCl <- GO_per_cl_list(GOterms_perCl, i)
       

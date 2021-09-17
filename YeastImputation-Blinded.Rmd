@@ -53,7 +53,7 @@ GO_train <- readRDS(file_GO_train)
 cuttree_values <- readRDS(file_cuttree_values)
 ```
 
-### 1. Coarse Sweep for Spearman + complete linkage (SandC)
+### 1. Coarse Sweep for Spearman + complete linkage 
 The following code will perform a K-fold validation for the imputation process which uses Spearman method to measure the distance matrix and complete as linkage method during the clustering process. 
 
 ```{r eval=FALSE, include=FALSE}

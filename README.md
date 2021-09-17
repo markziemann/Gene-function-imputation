@@ -1,4 +1,7 @@
 # Table of Contents
+
+[Project Files](#project-files)
+
 1. [Data Preparation](#data-preparation)</br>
     1A. [RNASeq Data](#rnaseq-data)
       a. [Quality Control](#quality-control)
@@ -24,6 +27,19 @@
     4B. [Imputation functions](#imputation-functions)</br>
     4C. [Optimisation functions](#optimisation-functions)</br>
 
+</br></br>
+
+## Project Files
+
+How to run the algorithm:
+
+  1. Create a folder named "Data" (case sensitive)
+  2. Open and run YeastDataPrep.Rmd 
+  3. Open and run YeastImputation-Blinded.Rmd 
+
+Note that the `optimise_impute` function which performs the coarse sweep and kfold validation on Chunk 1 of YeastImputation-Blinded.Rmd have run times that last up to 6 hours because of Cluster 2 having ~2000 gene members. 
+
+For a faster runtime, search "runtime" on functions.r and un-comment the line right below and run the `source("functions.R")` line.
 
 ## 1. Data Preparation
 Data preparation is divided into two main processes: RNASeq counts data 
