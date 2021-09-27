@@ -45,6 +45,24 @@ rownames(recall) <- c("s500","s200","s100","s50","s25")
 f1 <- 2* (precision * recall) / (precision + recall)
 
 f1
+
+
+
+summary_all_ <- as.data.frame(t(summary_all))
+scores <- list()
+sensitivity <- summary_all_$Sensitivity
+
+sensitivity_df <- data.frame()
+sensitivity_df <- rbind(sensitivity_df, sensitivity[1:4])
+sensitivity_df <- rbind(sensitivity_df, sensitivity[5:8])
+sensitivity_df <- rbind(sensitivity_df, sensitivity[9:12])
+sensitivity_df <- rbind(sensitivity_df, sensitivity[13:16])
+sensitivity_df <- rbind(sensitivity_df, sensitivity[17:20])
+rownames(sensitivity_df) <- c(304,139,93,54,30)
+colnames(sensitivity_df) <- c(0.1,0.5,0.7,0.9)
+
+scores[["Sensitivity"]] <- sensitivity_df
+saveRDS(scores, "scores_dynamic.rds")
 ```
 
 ## Make heatmaps
@@ -55,13 +73,13 @@ par(mfrow=c(3,1)) doesn't work for heatmap.2 for some reason.
 
 colfunc <- colorRampPalette(c("blue", "white", "red"))
 
-heatmap.2(precision, main="Precision", Colv = "None", Rowv = "None", dendrogram = "none",
+heatmap.2(as.matrix(scores$Specificity), main="Specificity", Colv = "None", Rowv = "None", dendrogram = "none",
           scale="none", col = colfunc(25), trace="none", margins = c(5,4))
 
-heatmap.2(recall, main="Recall", Colv = "None", Rowv = "None", dendrogram = "none",
+heatmap.2(as.matrix(scores$Recall), main="Recall", Colv = "None", Rowv = "None", dendrogram = "none",
           scale="none", col = colfunc(25), trace="none", margins = c(5,4))
 
-heatmap.2(f1, main="F1", Colv = "None", Rowv = "None", dendrogram = "none",
+heatmap.2(as.matrix(scores$F1_Score), main="F1", Colv = "None", Rowv = "None", dendrogram = "none",
           scale="none", col = colfunc(25), trace="none", margins = c(5,4))
 
 ```
