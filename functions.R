@@ -70,6 +70,63 @@ cl_lengthCut <- function(hr, min, max, interval){
   return(mycl_cuts)
 }
 
+# This function is an improvement for cl_lengthCut().
+# It uses the cutreeHybrid() from the dynamicTreeCut library
+# to iterative cut a dendrogram based on a minimum cluster size.
+# The output is a list  grouped by total clusters 
+# which gives (1) a table of GeneIDs assigned to a cluster number, 
+# (2) the cutree denominator to achieve that total cluster, and
+# (3) the tally of the total Gene IDs belonging to a cluster number.
+# Input:
+# hr = heirarchical clustering object
+# cl = distance matrix used to build hr
+# min and max = minimum and maximum value of the a sequence of values used
+#               in the minClusterSize attribute of the cutreeHybrid function 
+# interval = intervals for the sequence of values between min and max
+
+cl_cut_dynamic <- function(hr, cl, min, max, interval){
+  
+  mycl_cuts <- list()
+  
+  cut <- seq(from = min, to = max, by = interval)
+  
+  for (i in cut){
+    
+    dyn_tree <- cutreeHybrid(
+      # Input data: basic tree cutiing
+      dendro=hr, distM=as.matrix(cl),
+      # Branch cut criteria and options
+      minClusterSize = i, deepSplit = 4,
+      # PAM stage options
+      pamStage = TRUE, pamRespectsDendro = FALSE,
+      respectSmallClusters = TRUE,
+      # Various options
+      verbose = 1, indent = 0)
+    
+    dyn_cl <- as.data.frame(dyn_tree$labels)
+    colnames(dyn_cl) <- "ClusterNumber"
+    dyn_cl$GeneID <- hr$labels
+    
+    # Tally the total GeneIDs assigned per cluster
+    mycl_length <- length(unique(dyn_tree$labels))
+    tally <- list()
+    for (j in 1:mycl_length) {
+      tot <- length(which(dyn_cl$ClusterNumber == j))
+      tally[[j]] <- tot
+    }
+    
+    tallyDF <- t(as.data.frame(tally))
+    rownames(tallyDF) <- c(1:mycl_length)
+    
+    
+    mycl_cuts[[paste0(mycl_length)]][[paste0("GeneID_assignments")]] <- dyn_cl
+    mycl_cuts[[paste0(mycl_length)]][[paste0("min_cl_size")]] <- i
+    mycl_cuts[[paste0(mycl_length)]][["Tally"]] <- tallyDF
+  }
+  return(mycl_cuts)
+}
+
+
 # This function's output is a list that contains a dataframe with 
 # the pair of genes that makes up an edge (listed from and to)
 # with a corresponding correlation value treated as the edge 
@@ -209,8 +266,9 @@ wcorr_cluster <- function(gene_list, edgeList, cl_go, thresh){
     # turn NA to zero for GeneIDs with no GO terms
     weighted_go[is.na(weighted_go)] <- 0
     weighted_go <- weighted_go[,1]*weighted_go[,2:ncol(weighted_go)]
-    #wGO_thresh <- (as.matrix(weighted_go) > thresh)*1 
-    imputed_go <- colSums(weighted_go)/colSums(cl_go)
+    wGO_thresh <- (as.matrix(weighted_go) > thresh)*1 
+    imputed_go <- colSums(wGO_thresh)
+    #imputed_go <- colSums(weighted_go)/colSums(cl_go)
     wcorr_result[[gene]] <- imputed_go
   }
   setNames(wcorr_result, paste0(gene))
@@ -236,9 +294,12 @@ impute <- function (GOterms_perCl, cl_GOall=GO_blindedCl, corr_clAll,
   for (i in 1:clust_total){
     print(i)
     corr_cl <- corr_clAll[[i]]
+    cl_go <- cl_GOall[[i]]
+    cl_go_orig <- GOterms_perCl[[i]]
     
     #If all the genes in the cluster have no GOs and the matrix is empty
-    if (is_empty(corr_cl) == TRUE || isTRUE(corr_cl == 0)){
+    if (is_empty(corr_cl) == TRUE || isTRUE(corr_cl == 0) || 
+        is_empty(cl_go_orig) == TRUE || isTRUE(cl_go_orig == 0) ){
       wGO_list[[paste0("Cluster", i)]][[paste0("Comment")]] <- "No Gene Ontologies found"
       wGO_list[[paste0("Cluster", i)]][[paste0("Input")]] <- 0
       wGO_list[[paste0("Cluster", i)]][[paste0("Output")]] <- 0
@@ -251,9 +312,6 @@ impute <- function (GOterms_perCl, cl_GOall=GO_blindedCl, corr_clAll,
     corr_cl <- corr_cl[order(rownames(corr_cl)),]
     corr_cl <- corr_cl[,order(colnames(corr_cl))]
     gene_list <- rownames(corr_cl)
-    
-    cl_go <- cl_GOall[[i]]
-    cl_go_orig <- GOterms_perCl[[i]]
     
     # should add gene that are not included in the GO data otherwise merge 
     # will yield weird results
@@ -290,8 +348,8 @@ impute <- function (GOterms_perCl, cl_GOall=GO_blindedCl, corr_clAll,
     wGO_cl <- wcorr_cluster(gene_list=gene_list, edgeList=edgeList, 
                             cl_go=cl_go, thresh=thresh)
     wGO_df <- as.data.frame(do.call(rbind, wGO_cl))
-    #wGO_thresh <- (as.matrix(wGO_df) > 0)*1 
-    wGO_thresh <- (as.matrix(wGO_df) >=thresh)*1 
+    wGO_thresh <- (as.matrix(wGO_df) > 0)*1 
+    #wGO_thresh <- (as.matrix(wGO_df) >=thresh)*1 
     wGO_thresh <- wGO_thresh[order(rownames(wGO_thresh)),]
     wGO_thresh <- wGO_thresh[,order(colnames(wGO_thresh))]
     
@@ -356,6 +414,8 @@ stats_cl <- function(imputed_df, clust_total){
     
     stats_list[[paste0("Cluster", i)]][[paste0("Sensitivity(TPR)")]] <- TPR
     stats_list[[paste0("Cluster", i)]][[paste0("Specificity(TNR)")]] <- TNR
+    stats_list[[paste0("Cluster", i)]][[paste0("FPR")]] <- FPR
+    stats_list[[paste0("Cluster", i)]][[paste0("FNR")]] <- FNR
     stats_list[[paste0("Cluster", i)]][[paste0("Precision(PPV)")]] <- PPV
     stats_list[[paste0("Cluster", i)]][[paste0("Accuracy(ACC)")]] <- ACC
     stats_list[[paste0("Cluster", i)]][[paste0("F1_Score")]] <- F1
@@ -413,6 +473,8 @@ stats_all <- function(stats_cl){
   
   stats_total[["Sensitivity"]] <- TPR
   stats_total[["Specificity"]] <- TNR
+  stats_total[["FPR"]] <- FPR
+  stats_total[["FNR"]] <- FNR
   stats_total[["Precision"]] <- PPV
   stats_total[["Accuracy"]] <- ACC
   stats_total[["F1_Score"]] <- F1
@@ -527,7 +589,7 @@ summary_Csweep <- function(kfold_list){
   summary_df <- summary[11,]
   rownames(summary_df)[rownames(summary_df) == "Mean"] <- row_name
   
-  stat_type_list <- c(7:11)
+  stat_type_list <- c(7:length(kfold_list[[1]][[1]]))
   
   for (i in stat_type_list){
     summary <- mean_Csweep(kfold_list, stat_type=i)
