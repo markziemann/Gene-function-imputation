@@ -58,9 +58,7 @@ cuttree_values <- readRDS(file_cuttree_values)
 The following code will perform a K-fold validation for the imputation process which uses Spearman method to measure the distance matrix and complete as linkage method during the clustering process. 
 
 ```{r eval=FALSE, include=FALSE}
-# Coarse sweep of the following parameters: cluster total(20, 50, 200, 500) and threshold (0.1, 0.4, 0.8)
-
-#The normal run time is ~6 hours because of cluster 2 that is usually ~2000 genes
+# Coarse sweep of the following parameters: cluster total(304,139,93,54,30) and thresholds (0.1 to 0.9). The comments next to the cluster size in cl_list is the minumum cluster size used in the dynamic tree cut. These values are saved in the cuttree_values variable. 
 
 cl_list <- c(304, #10
              139, #20
