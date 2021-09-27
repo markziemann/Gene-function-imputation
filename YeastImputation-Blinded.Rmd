@@ -41,7 +41,8 @@ source("functions.R")
 file_PASS <- "tmm_agg_s.rds"
 file_GO <-"GO_table.rds"
 file_GO_train <- "GO_train.rds"
-file_cuttree_values <- "cuttree_values_complete.rds"
+#file_cuttree_values <- "cuttree_values_complete.rds"
+file_cuttree_values <- "cuttree_values_dynamic.rds"
 
 # Normalised, aggregated, and scaled RNASeq counts
 tmm_agg_s <- readRDS(file_PASS)
@@ -61,8 +62,13 @@ The following code will perform a K-fold validation for the imputation process w
 
 #The normal run time is ~6 hours because of cluster 2 that is usually ~2000 genes
 
-cl_list <- c(100)
-thresh_list <- c(0.5)
+cl_list <- c(304, #10
+             139, #20
+             93, #30
+             54, #50
+             30) #102
+#thresh_list <- c(0.1,0.5, 0.7, 0.9)
+thresh_list <- c(0.2,0.3,0.4,0.6, 0.8)
 
 start <- Sys.time()
 
@@ -71,6 +77,10 @@ sample_kfold <- optimise_impute(cl_list, thresh_list, cuttree_values, tmm_agg_s,
 end <- Sys.time()
 totalTime <- end -start
 totalTime
+
+saveRDS(sample_kfold, "kfold_dynamic_sum1_pt2.rds")
+
+}
 
 ```
 
@@ -82,7 +92,7 @@ dat_list <- lapply(sample_kfold, function(x) x[names(x)!="Index_folds"])
 
 # List the all the mean predicton scores for each parameter 
 summary_all <- summary_Csweep(dat_list)
-#saveRDS(summary_all, "summary_all.rds")
+saveRDS(summary_all, "kfold_dynamic_summary_sum1.rds")
 
 ```
 
