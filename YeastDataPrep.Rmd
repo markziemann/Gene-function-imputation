@@ -34,6 +34,7 @@ suppressPackageStartupMessages({
     library(dendextend)
     library(ggplot2)
     library(DESeq2)
+    library(dynamicTreeCut)
 })
 
 source("functions.R")
@@ -224,7 +225,6 @@ labels_colors(dend) <- "white"
 plot(dend, main = paste0("Complete Method: Corr = ", signif(corr_cophVSdist)))
 dev.off()
 
-
 ```
 
 ### 7b. Heirarchical Clustering: deciding the number of clusters
@@ -252,8 +252,13 @@ This functions will will yield a list of genes grouped in cluster sized of 50 to
 
 ```{r eval=FALSE, include=FALSE}
 
+# Different Cluster sizes using the normal dendrogram cutree function
 cuttree_values <- cl_lengthCut(hr=hr, min=50, max=2000, interval=2)
 saveRDS(cuttree_values, "cuttree_values.rds")
+
+# Different Cluster sizes using the dynamic method, cutreeHybrid from the dynamicTreeCut library
+cuttree_values_dynamic <- cl_cut_dynamic(hr=hr, cl=cl, min=4, max=302, interval=2)
+saveRDS(cuttree_values_dynamic, "cuttree_values_dynamic.rds")
 
 ```
 
