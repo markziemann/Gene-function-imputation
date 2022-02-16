@@ -243,6 +243,12 @@ GO_per_cl_blinded <- function(x,y,GO_list_perCl,clust_total){
 
 ### ------------- Imputation functions
 
+# This function calculates the geometric mean of an array of numbers
+
+gmean <- function(x){
+  exp(mean(log(x[x>0])))
+}
+
 # This function's output is a nested list of genes belonging to a 
 # cluster with a tally of how many correlation values passed the threshold
 # that connects the gene to a GO Term. 
@@ -267,8 +273,10 @@ wcorr_cluster <- function(gene_list, edgeList, cl_go, thresh){
     weighted_go[is.na(weighted_go)] <- 0
     weighted_go <- weighted_go[,1]*weighted_go[,2:ncol(weighted_go)]
     wGO_thresh <- (as.matrix(weighted_go) > thresh)*1 
-    imputed_go <- colSums(wGO_thresh)
+    imputed_go <- colSums(weighted_go)
     #imputed_go <- colSums(weighted_go)/colSums(cl_go)
+    #imputed_go <- apply(weighted_go, 2, gmean)
+    #imputed_go <- apply(weighted_go, 2, max)
     wcorr_result[[gene]] <- imputed_go
   }
   setNames(wcorr_result, paste0(gene))
@@ -628,7 +636,7 @@ optimise_impute <- function(cl_list, thresh_list, cuttree_values, counts, GO_ann
       # For faster runtime, set cluster 2 to 0
       #corr_clAll[2] <- 0
       
-      GOterms_perCl <- GO_per_cl(GO_table, cl, i)
+      GOterms_perCl <- GO_per_cl(GO_annot, cl, i)
       GO_list_perCl <- GO_per_cl_list(GOterms_perCl, i)
       
       sc <- cross_val(n=10, GO_annot=GO_annot, clusters=cl,

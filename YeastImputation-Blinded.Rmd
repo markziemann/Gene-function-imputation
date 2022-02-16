@@ -39,17 +39,20 @@ source("functions.R")
 ### Load Pre-requisite RDS files 
 ```{r echo=TRUE}
 file_PASS <- "tmm_agg_s.rds"
+file_tmm_agg_s_test <- "tmm_agg_s_test.rds"
 file_GO <-"GO_table.rds"
 file_GO_train <- "GO_train.rds"
-#file_cuttree_values <- "cuttree_values_complete.rds"
+file_GO_test <- "GO_test.rds"
 file_cuttree_values <- "cuttree_values_dynamic.rds"
 
 # Normalised, aggregated, and scaled RNASeq counts
 tmm_agg_s <- readRDS(file_PASS)
+tmm_agg_s_test <- readRDS(file_tmm_agg_s_test)
 # Binary df for GO annotations 
 GO_table <- readRDS(file_GO)
 # From GO_table, selected randomly as training data
 GO_train <- readRDS(file_GO_train)
+GO_test <- readRDS(file_GO_test)
 # List of genes grouped in different cluster sizes
 cuttree_values <- readRDS(file_cuttree_values)
 ```
@@ -65,22 +68,117 @@ cl_list <- c(304, #10
              93, #30
              54, #50
              30) #102
-#thresh_list <- c(0.1,0.5, 0.7, 0.9)
-thresh_list <- c(0.2,0.3,0.4,0.6, 0.8)
 
-start <- Sys.time()
+#cl_list <- c(93)
+thresh_list <- c(0, 1)
 
 sample_kfold <- optimise_impute(cl_list, thresh_list, cuttree_values, tmm_agg_s, GO_train)
 
-end <- Sys.time()
-totalTime <- end -start
-totalTime
-
-saveRDS(sample_kfold, "kfold_dynamic_sum1_pt2.rds")
-
-}
+saveRDS(sample_kfold, "kfold_dyn_sum01.rds")
 
 ```
+
+### 2. dendrogram
+
+```{r}
+cl <- readRDS("cl_dist_matrix.rds")
+hr <- hclust(cl , method="complete") 
+saveRDS(hr,"hr.rds")
+    
+dend <- as.dendrogram(hr)
+c <- cutree(dend, 10)
+
+colored_dend <- color_labels(dend, col = dynamicColors, clusters = as.numeric(dynamicColors), groupLabels = TRUE)
+plot(colored_dend)
+
+pdf("Data/dend.pdf", width=80, height=15)
+par(cex = 0.05)
+plot(dend, main="Gene-to-Gene Correlation Dendrogram of Saccharomyces cerevisiae")
+dev.off()
+
+# cluster 3
+cl3_139_dend <- find_dendrogram(dend, cl3_139GeneIDS)
+colored_139 <- color_labels(cl3_139_dend,labels = "ICR1",col = "red", groupLabels = TRUE)
+
+sub_139 <- c("ICR1", "YNL025C", "YLL006W", "YCL004W", "YDR314C", "YMR154C", "YBR223C", "YHR159W")
+sub_139_dend <- find_dendrogram(dend, sub_139)
+sub_139_colored <- color_labels(sub_139_dend,labels = "ICR1", col = "blue")
+
+png("Data/sub_cl3_139.png", width = 7*300, height = 4*300, res = 300, pointsize = 8)
+par(cex = 1.5)
+plot(sub_139_colored)
+dev.off()
+
+png("Data/cl3_139.png", width = 7*300, height = 4*300, res = 300, pointsize = 8)
+par(cex = 0.8)
+plot(colored_139)
+dev.off()
+
+# cluster 16
+cl16_139_dend <- find_dendrogram(dend, pseudogene_cl14_genes)
+colored_139 <- color_labels(cl16_139_dend,labels = "YPL275W",col = "red")
+
+#png("Data/cl3_139.png", width = 7*300, height = 4*300, res = 300, pointsize = 8)
+par(cex = 0.8)
+plot(colored_139)
+#dev.off()
+
+
+# cluster 1
+cl1_139_dend <- find_dendrogram(dend, cl1_geneList)
+colored_cl1_139 <- color_labels(cl1_139_dend,labels = "HRA1",col = "red")
+
+par(mfrow=c(3,1))
+
+plot(dend, main="Main")
+plot(cut(dend, h=75)$upper, 
+     main="Upper tree of cut at h=75")
+plot(cut(dend, h=75)$lower[[2]], 
+     main="Second branch of lower tree with cut at h=75")
+
+
+dyn_tree <- cutreeHybrid(
+      # Input data: basic tree cutiing
+      dendro=hr, distM=as.matrix(cl),
+      # Branch cut criteria and options
+      minClusterSize = 20, deepSplit = 4,
+      # PAM stage options
+      pamStage = TRUE, pamRespectsDendro = FALSE,
+      respectSmallClusters = TRUE,
+      # Various options
+      verbose = 1, indent = 0)
+
+
+dynamicColors = labels2colors(dyn_tree$labels)
+table(dynamicColors)
+# Plot the dendrogram and colors underneath
+pdf("Data/geneTreeLabels.pdf")
+plotDendroAndColors(hr, dynamicColors, "Dynamic Tree Cut",
+dendroLabels = FALSE, hang = 0.03,
+#groupLabels = hr$labels,
+addGuide = TRUE,
+guideAll = TRUE, guideHang = 0.05,
+addTextGuide = TRUE,
+main = "Gene dendrogram and module colors")
+dev.off()
+
+```
+
+### interactive dendro
+
+```{r}
+library()
+if (!file.exists("Data/lncRNAs.tsv")){
+    download.file("https://www.genenames.org/cgi-bin/genegroup/download?id=788&type=branch", 
+              destfile = "Data/lncRNAs.tsv")}
+lnc <- fread("Data/lncRNAs.tsv", sep = '\t', header = TRUE)
+
+a <- setdiff(rownames(tmm_agg_s), lnc$`Approved symbol`)
+
+rn
+  
+```
+
 
 ### 2. Summary of performace measures for Pearson + complete linkage
 
@@ -89,8 +187,8 @@ saveRDS(sample_kfold, "kfold_dynamic_sum1_pt2.rds")
 dat_list <- lapply(sample_kfold, function(x) x[names(x)!="Index_folds"])
 
 # List the all the mean predicton scores for each parameter 
-summary_all <- summary_Csweep(dat_list)
-saveRDS(summary_all, "kfold_dynamic_summary_sum1.rds")
+summary_all <- t(summary_Csweep(dat_list))
+saveRDS(summary_all, "summary_all_dynamic_max.rds")
 
 ```
 

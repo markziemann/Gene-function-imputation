@@ -354,6 +354,11 @@ GO_train[blinded_ind, 2:ncol(GO_train)] = 0
 
 saveRDS(GO_train, "GO_train.rds")
 
+GO_test <- GO_table[blinded_ind,]
+saveRDS(GO_test, "GO_test.rds")
+
+tmm_agg_s_test <- tmm_agg_s[rownames(tmm_agg_s) %in% GO_test$GeneID,]
+saveRDS(tmm_agg_s_test, "tmm_agg_s_test.rds")
 ```
 
 
